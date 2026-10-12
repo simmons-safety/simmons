@@ -802,6 +802,10 @@ window.AI_CONFIG = {
     .card > header{margin-bottom:16px;flex-wrap:wrap}
     .cal-d{min-height:58px} .cal-d .evs{display:none}
     .cal-d b{font-size:11.5px}
+    /* 칸 안 일정은 숨기고, 일정이 있는 날은 점으로 표시합니다 (누르면 그날 일정 팝업) */
+    .cal-d.has::after{content:"";position:absolute;left:50%;bottom:9px;width:5px;height:5px;
+      margin-left:-2.5px;border-radius:50%;background:var(--ink)}
+    .cal-d .plus{display:none}
     .cal-h span{font-size:9.5px;letter-spacing:.14em}
     .calnav{width:100%;justify-content:flex-start}
     .calnav .note{display:none}
@@ -1409,6 +1413,7 @@ window.AI_CONFIG = {
     <div class="sheet-ft">
       <div class="spacer"></div>
       <button class="reset" id="btnDayPopupClose">닫기</button>
+      <button class="reset" id="btnDayPopupAdd">＋ 일정 추가</button>
     </div>
   </div>
 </div>
@@ -1816,15 +1821,16 @@ function renderMonthPanel() {
 
 function renderUpcoming() {
   var t = new Date();
-  var from = ymd(t), to = ymd(addDays(t, 60));
-  /* 시작일이 지났어도 아직 끝나지 않은 기간 일정은 계속 보여 줍니다 */
+  var from = ymd(t);
+  /* 오늘 이후 일정은 기간 제한 없이 모두 보여 주고,
+     시작일이 지났어도 아직 끝나지 않은 기간 일정은 계속 보여 줍니다 */
   var list = state.schedule.filter(function (r) {
     var e = schEnd(r) || r.일자;
-    return e >= from && r.일자 <= to;
+    return e >= from;
   }).sort(function (a, b) {
     var ka = (a.일자 < from ? from : a.일자), kb = (b.일자 < from ? from : b.일자);
     return (ka + a.시간).localeCompare(kb + b.시간);
-  }).slice(0, 10);
+  });
 
   $('upBody').innerHTML = list.length ? tbl(
     [{ t: '일자', w: '72px' }, { t: 'D-day', w: '58px' }, { t: '시간', w: '54px' }, { t: '일정명' }],
@@ -2019,6 +2025,7 @@ function dayRows(date) {
 /** 하루 일정 전체보기 팝업 */
 function openDayPopup(date) {
   var d = parseYmd(date);
+  state.popDate = date;
   var rows = dayRows(date);
   $('dayPopupTitle').textContent = d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + DOW[d.getDay()] + ') · ' + rows.length + '건';
   $('dayPopupBody').innerHTML = rows.length ? tbl(
@@ -6043,8 +6050,16 @@ function bind() {
     var cell = e.target.closest('.cal-d[data-date]');
     if (cell) {
       selectDay(cell.dataset.date);
+      // 모바일은 달력에 일정이 보이지 않으므로 날짜를 누르면 그날 일정 팝업을 띄웁니다
+      if (isMobileCal()) { openDayPopup(cell.dataset.date); return; }
       // 기존 일정이 있는 날은 먼저 목록만 보여주고, + 버튼을 눌러야 추가 폼이 열립니다
       if (!cell.classList.contains('has')) openSchedule(null, cell.dataset.date);
+      return;
+    }
+
+    if (e.target.closest('#btnDayPopupAdd')) {
+      closeDayPopup();
+      openSchedule(null, state.popDate);
       return;
     }
 
@@ -6197,7 +6212,8 @@ function bind() {
     if (cell && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
       selectDay(cell.dataset.date);
-      if (!cell.classList.contains('has')) openSchedule(null, cell.dataset.date);
+      if (isMobileCal()) openDayPopup(cell.dataset.date);
+      else if (!cell.classList.contains('has')) openSchedule(null, cell.dataset.date);
     }
     if (e.key === 'Escape' && $('scrim').classList.contains('on')) closeSheet();
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && $('scrim').classList.contains('on')) submitSheet();
@@ -6287,6 +6303,11 @@ function gotoMonth(delta) {
   state.selDate = (today.getFullYear() === state.month.getFullYear() && today.getMonth() === state.month.getMonth())
     ? ymd(today) : ymd(state.month);
   renderMonthPanel();
+}
+
+/** 달력 칸에 일정이 숨겨지는 모바일 폭인지 (CSS 640px 기준과 동일) */
+function isMobileCal() {
+  return window.matchMedia && window.matchMedia('(max-width:640px)').matches;
 }
 
 function selectDay(date) {
