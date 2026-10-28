@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>안전보건 대시보드</title>
+<link rel="icon" href="data:,">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
@@ -17,7 +18,10 @@
 window.WX_CONFIG = {          // 헤더 날씨 — 사업장 위치
   name: '',
   lat:  37.1720,
-  lon:  127.4297
+  lon:  127.4297,
+  // 기상특보 띠 : 공공데이터포털 '기상청_기상특보 조회서비스' 인증키(Decoding).
+  // 지역별 날씨 창에서 그 지역 날씨 위에 특보(또는 '특보 없음')가 나옵니다. 비워 두면 표시 안 함
+  kmaKey: '75c8402532d8e702328e7e4b4e812aa4fc66e2fc45b7f577c39e85cafbbc7e60'
 };
 
 window.SB_CONFIG = {
@@ -86,6 +90,49 @@ window.AI_CONFIG = {
   .wx-ic svg{width:100%;height:100%;display:block}
   .wx-desc{font-size:12px;font-weight:500;color:var(--ink2)}
   .wx-sub{font-size:11px;font-weight:400;color:var(--ink3);font-variant-numeric:tabular-nums}
+  .wx[role=button]{cursor:pointer;padding:6px 8px;margin:0 -8px;transition:background .15s}
+  .wx[role=button]:hover{background:var(--panel2)}
+  .wx[role=button]:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+
+  /* 지역별 날씨 창 (상단 날씨 클릭) */
+  .gw-bd{padding:22px 26px 24px}
+  .gw-search{display:flex;gap:6px;margin:0 0 14px}
+  .gw-search input{flex:1;min-width:0}
+  .gw-results{border:1px solid var(--line);margin:0 0 18px;max-height:260px;overflow:auto}
+  .gw-results button{display:block;width:100%;text-align:left;background:#fff;border:0;border-bottom:1px solid var(--line2);
+    padding:11px 14px;font-size:13px;color:var(--ink);cursor:pointer}
+  .gw-results button:last-child{border-bottom:0}
+  .gw-results button:hover{background:var(--panel2)}
+  .gw-results small{display:block;font-size:11px;color:var(--ink3)}
+  .gw-loc{font-size:12px;font-weight:500;color:var(--ink3);margin:0 0 6px}
+  .gw-now{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding-bottom:18px;border-bottom:1px solid var(--ink)}
+  .gw-now .t{font-size:44px;font-weight:700;letter-spacing:-.05em;line-height:1}
+  .gw-now .sky{font-size:16px;font-weight:600}
+  .gw-now .fl{font-size:12.5px;color:var(--ink2)}
+  .gw-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--line);
+    border:1px solid var(--line);margin:18px 0}
+  .gw-grid div{background:#fff;padding:11px 12px}
+  .gw-grid .k{display:block;font-size:10.5px;font-weight:600;color:var(--ink3);letter-spacing:.02em}
+  .gw-grid .v{font-size:15px;font-weight:700;letter-spacing:-.03em}
+  .gw-hours{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;font-variant-numeric:tabular-nums}
+  .gw-hours div{flex:none;min-width:58px;text-align:center;background:var(--panel2);padding:8px 6px;font-size:11.5px}
+  .gw-hours b{display:block;font-size:14px;margin:2px 0}
+  .gw-alert{margin:16px 0 0;padding:11px 14px;background:#FDF0EE;color:var(--human);font-size:12.5px;font-weight:600}
+  .gw-msg{padding:28px 0;text-align:center;color:var(--ink2);font-size:13.5px;line-height:1.7}
+  .gw-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:20px;
+    font-size:11px;color:var(--ink3)}
+  /* 기상특보 흐르는 띠 (지역 날씨 위) */
+  .wxalert{display:block;margin:0 0 14px;background:var(--human);color:#fff;overflow:hidden;height:32px;line-height:32px;
+    font-size:12.5px;font-weight:600;letter-spacing:-.01em;text-decoration:none;white-space:nowrap}
+  .wxalert.mild{background:#D9822B}            /* 주의보 · 예비특보만 있을 때 */
+  .wxalert.none{background:var(--panel2);color:var(--ink2);height:26px;line-height:26px;
+    font-size:11.5px;font-weight:500;text-align:left;padding:0 12px}   /* 특보 없음 · 흐르지 않음 */
+  .wxalert.none .trk{animation:none;padding-left:0}
+  .wxalert .trk{display:inline-block;padding-left:100%;animation:wxmarq 20s linear infinite}
+  .wxalert:hover .trk{animation-play-state:paused}
+  @keyframes wxmarq{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+  @media(prefers-reduced-motion:reduce){ .wxalert .trk{animation:none;padding-left:16px} }
+  @media(max-width:720px){ .gw-grid{grid-template-columns:repeat(2,minmax(0,1fr))} .gw-now .t{font-size:38px} }
   .zero{text-align:right}
   .zero .lbl{font-size:9px;font-weight:700;letter-spacing:.24em;color:var(--ink3);display:block;margin-bottom:5px}
   .zero .n{font-size:22px;font-weight:700;color:var(--ink);line-height:1;letter-spacing:-.04em;display:block;white-space:nowrap}
@@ -458,11 +505,13 @@ window.AI_CONFIG = {
   .bnav-sub{max-width:1340px;margin:0 auto;padding:11px 28px;display:flex;align-items:center;
     gap:18px;flex-wrap:wrap;font-size:12.5px}
   .bnav-sub .lbl{font-weight:700;color:var(--ink);white-space:nowrap;letter-spacing:-.02em}
-  .bnav-sub button{background:none;border:none;padding:0;margin:0;cursor:pointer;color:var(--ink3);
+  .bnav-sub button,.bnav-sub a.ext{background:none;border:none;padding:0;margin:0;cursor:pointer;color:var(--ink3);
     font-size:12.5px;font-weight:500;white-space:nowrap;
     text-decoration:underline;text-decoration-color:transparent;text-underline-offset:3px;transition:.15s}
-  .bnav-sub button:hover{color:var(--ink)}
+  .bnav-sub button:hover,.bnav-sub a.ext:hover{color:var(--ink)}
   .bnav-sub button[aria-pressed="true"]{color:var(--ink);font-weight:700;text-decoration-color:var(--ink)}
+
+  .bnav button.hov{color:var(--ink)}
 
   /* ══════════ 공통 ══════════ */
   .secttl{font-size:9.5px;font-weight:700;letter-spacing:.22em;color:var(--ink3);margin:24px 0 12px;text-transform:uppercase}
@@ -786,6 +835,8 @@ window.AI_CONFIG = {
     .tb-in{padding:0 14px;height:58px;gap:12px}
     .wordmark-logo{height:24px}
     .wx-loc{display:none}
+    .wx.gps .wx-loc{display:inline}   /* 내 위치 날씨일 때는 지역명을 보여 주고 하늘 상태를 줄임 */
+    .wx.gps .wx-desc{display:none}
     .wx-now b{font-size:16px}
     .wx-desc{font-size:11px}
     .bnav-outer{top:58px;margin-bottom:16px}
@@ -815,6 +866,227 @@ window.AI_CONFIG = {
   }
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+<!-- ══════════════════════════════════════════════════════════
+     HYBE CONCEPT LAYER
+     · hybecorp.com 의 무드: 순수 흑백, 거대한 영문 타이포, 넉넉한 여백,
+       라운드 그레이 패널, 필(pill) 버튼
+     · 위의 기본 스타일을 덮어쓰는 층입니다. 이 블록만 지우면 이전 디자인으로 돌아갑니다.
+     ══════════════════════════════════════════════════════════ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap">
+<style>
+  :root{
+    --paper:#FFFFFF; --panel:#FFFFFF; --panel2:#F4F4F4;
+    --line:#E3E3E3; --line2:#EAEAEA; --grid:#E6E6E6;
+    --ink:#000000; --ink2:#4D4D4D; --ink3:#999999;
+    --accent:#000000; --accent-d:#000000; --accent-ink:#000000; --brass:#000000; --env:#000000; --pine:#000000;
+    --hover:rgba(0,0,0,.045);
+    --r-xl:28px; --r-l:20px; --r-m:14px; --r-s:8px; --pill:999px;
+    --fd:'Outfit','Pretendard Variable',Pretendard,-apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+    --w:1440px; --gx:40px;
+  }
+  body{padding-bottom:0}
+  ::selection{background:#000;color:#fff}
+  .wrap,.tb-in,.hero-in,.bnav,.bnav-sub{max-width:var(--w);padding-left:var(--gx);padding-right:var(--gx)}
+  .wrap-body{padding-top:0;padding-bottom:96px}
+
+  /* ── 상단 바 : 흰 바탕, 로고 좌측, 아이콘은 원형 ── */
+  .topbar{background:rgba(255,255,255,.94);border-bottom:none}
+  .tb-in{height:76px;gap:14px}
+  .wordmark-logo{height:28px}
+  .popup-btn{width:40px;height:40px;border-radius:50%;transition:background .15s,color .15s}
+  .popup-btn:hover{background:var(--panel2);color:#000}
+  .hdr-sep{height:18px}
+  .wx-now b{font-family:var(--fd);font-weight:500;font-size:21px;letter-spacing:-.02em}
+  .ghost-dark{border-radius:var(--pill)}
+
+  /* ── 히어로 : 검은 판 위 거대한 영문 섹션명 ── */
+  .hero{background:#000;color:#fff;overflow:hidden}
+  .hero-in{padding-top:26px;padding-bottom:16px}
+  /* 가장 긴 이름(Work Environment)도 잘리지 않는 크기로 맞춰, 어느 게시판에서나 같은 높이가 되게 합니다. */
+  .hx-big{margin:0;font-family:var(--fd);font-weight:600;color:#fff;
+    font-size:clamp(34px,4.8vw,76px);line-height:.88;letter-spacing:-.055em;
+    white-space:nowrap;overflow:hidden;text-overflow:clip;padding-bottom:.06em}
+  .hx-big.swap{animation:hxIn .62s cubic-bezier(.2,.75,.15,1)}
+  @keyframes hxIn{from{opacity:0;transform:translateY(38%)}to{opacity:1;transform:none}}
+  .hx-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px 28px;flex-wrap:wrap;
+    margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.24)}
+  .hero h1{font-size:19px;font-weight:700;letter-spacing:-.04em;color:#fff;line-height:1.3;white-space:normal}
+  .hx-crumb{font-weight:400;color:rgba(255,255,255,.62);margin-left:12px}
+  .hx-crumb b{font-weight:500;color:#fff}
+  .hx-date{font-family:var(--fd);font-size:14px;font-weight:400;color:rgba(255,255,255,.62);
+    letter-spacing:.005em;font-variant-numeric:tabular-nums}
+
+  /* ── 탭 : 같은 폭의 필 세그먼트 (아래 메가 메뉴 열과 정렬) ── */
+  .bnav-outer{top:76px;background:rgba(255,255,255,.95);border-top:none;
+    border-bottom:1px solid var(--line);margin-bottom:36px}
+  .bnav{gap:6px;padding-top:14px;padding-bottom:14px}
+  .bnav button{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    padding:10px 10px 11px;margin:0;border:none;border-radius:var(--r-l);
+    color:var(--ink);white-space:nowrap;transition:background .18s,color .18s}
+  .bnav button .t{display:block;font-family:var(--fd);font-size:17px;font-weight:500;letter-spacing:-.02em;line-height:1.2}
+  .bnav button .k{font-size:11.5px;font-weight:500;color:var(--ink3);letter-spacing:-.02em;transition:color .18s}
+  .bnav button:hover,.bnav button.hov{background:var(--panel2);color:#000}
+  .bnav button[aria-pressed="true"],.bnav button[aria-pressed="true"].hov{background:#000;color:#fff}
+  .bnav button[aria-pressed="true"] .t{font-weight:500}
+  .bnav button[aria-pressed="true"] .k{color:rgba(255,255,255,.6)}
+  .bnav button:focus-visible{outline:2px solid #000;outline-offset:2px}
+
+  .bnav-sub-outer{background:#fff;border-top:1px solid var(--line2);border-bottom:none}
+  .bnav-sub{padding-top:12px;padding-bottom:14px;gap:6px}
+  .bnav-sub .lbl{font-size:13px;margin-right:10px}
+  .bnav-sub button,.bnav-sub a.ext{font-size:12.5px;padding:8px 15px;border:1px solid var(--line);border-radius:var(--pill);
+    color:var(--ink2);text-decoration:none;background:#fff}
+  .bnav-sub button:hover,.bnav-sub a.ext:hover{border-color:#000;color:#000}
+  .bnav-sub button[aria-pressed="true"]{background:#000;border-color:#000;color:#fff;font-weight:600}
+
+  /* ── 카드 : 테두리 없는 라운드 그레이 패널 ── */
+  .card{background:var(--panel2);border:none;border-radius:var(--r-xl);padding:34px 36px 36px}
+  .card > header{border-bottom:none;padding-bottom:0;margin-bottom:24px}
+  .card h2{font-size:21px;font-weight:700;letter-spacing:-.045em}
+  .card header .note{font-size:12px;font-weight:400;letter-spacing:-.01em}
+  .g-top,.g-half,.g-third,.lib-grid,.nwgrid,.colstack{gap:16px}
+  .g-top,.g-half,.g-third{margin-bottom:16px}
+  .card[style*="margin-top:12px"]{margin-top:16px !important}
+  .card.wk{padding:26px 28px 28px}
+  .card.wk.now{border:none;box-shadow:inset 0 0 0 2px #000}
+  .subttl,.secttl{font-size:12.5px;font-weight:700;letter-spacing:-.02em;color:var(--ink);text-transform:none}
+  .subttl{border-top-color:var(--line)}
+
+  /* ── KPI : 개별 라운드 타일, 숫자는 Outfit ── */
+  .kpis,.kpis.k1,.kpis.k2,.kpis.k3,.kpis.k4,.kpis.k5{gap:16px;background:none;border:none;border-radius:0;overflow:visible;margin-bottom:16px}
+  .kpi{background:var(--panel2);border:none !important;border-radius:var(--r-xl);padding:28px 30px 30px}
+  .kpi .lab{border-top:none;padding-top:0;margin-bottom:26px;font-size:13px;font-weight:600;color:var(--ink);letter-spacing:-.02em}
+  .kpi .lab i,.lgd i,.saf-sitehead i,.wk-h i{border-radius:50%}
+  .kpi .v{font-family:var(--fd);font-weight:500;font-size:60px;letter-spacing:-.045em;line-height:.9}
+  .kpis.k1 .v{font-size:84px}
+  .kpi .v em{font-family:var(--f);font-size:14px}
+  .kpi .d{font-size:12px;margin-top:16px}
+  .kpi2-v,.bud-tile-v,.qscore-big{font-family:var(--fd);font-weight:500;letter-spacing:-.035em}
+  .kpi2-item + .kpi2-item{border-left-color:var(--line)}
+
+  /* ── 타일 그리드 (예산 · 중처법 12개 항목) ── */
+  .budgrid,.csagrid{gap:10px;border:none}
+  .bud-tile,.csa-card{border:none;border-radius:var(--r-l);background:#fff}
+  .bud-tile:hover{background:#fff;box-shadow:inset 0 0 0 1px #000}
+  .bud-tile.active{background:#fff;box-shadow:inset 0 0 0 2px #000}
+  .bud-tile.total,.bud-tile.total:hover{background:#000;box-shadow:none}
+  .bud-detail{background:#fff;border-radius:var(--r-l)}
+  .csa-card.link:hover{background:#000}
+
+  /* ── 표 ── */
+  table.dt th{font-size:11px;font-weight:600;letter-spacing:.01em;text-transform:none;color:var(--ink3);border-bottom-color:#000}
+  table.dt td{border-bottom-color:var(--line)}
+  table.dt tr.sum td{background:#fff}
+  table.dt tbody tr:hover,tr.row-click:hover td,.ev-row:hover,.wk-row:hover,.nw-i:hover,.yr-row:hover,.lc-wrap:hover{background:var(--hover)}
+
+  /* ── 버튼 · 입력 : 필 형태 ── */
+  .reset,.fb,.calmove,.st-b,.qpill,.hl-btn,.btn-go,.btn-del,.b,.ev-c,.nw-i-c,.qfile-chip,.wk-h b,.wk-m em,.wk-m i,.toast,.nw-act .reset,.nwtabs button i{border-radius:var(--pill)}
+  .reset{padding:10px 19px;font-size:12.5px}
+  .reset.go,.btn-go,.hl-btn{padding:12px 26px}
+  .fb{padding:7px 15px;font-size:11.5px}
+  .monthsel button{width:36px;height:36px;border-radius:50%}
+  .monthsel button.reset{border-radius:var(--pill)}
+  select,input,textarea,.pin-row input{border-radius:var(--r-m)}
+  .addbtn{border-radius:var(--r-m)}
+  .b{padding:4px 11px;font-size:10px}
+  .b-lo{background:#fff;border-color:var(--line)}
+
+  /* ── 막대 · 그래프 ── */
+  .gz .tr,.gz .fl,.qcatbar .track,.qcatbar .fill{border-radius:var(--pill)}
+  .gz .tr{height:8px}
+  .bc-b,.bc-stack{border-radius:6px 6px 0 0}
+  .bc{border-bottom-color:#000}
+  .lc-title b{font-size:15px}
+
+  /* ── 달력 ── */
+  .cal-h{border-bottom:none}
+  .cal-h span{font-family:var(--fd);font-size:12px;font-weight:500;letter-spacing:.02em;padding-bottom:12px}
+  .cal-g{border-top:1px solid var(--line);border-left:1px solid var(--line);border-radius:var(--r-m);overflow:hidden;background:transparent}
+  .cal-d b{font-family:var(--fd);font-size:13px;font-weight:500;display:inline-block;min-width:24px;height:24px;line-height:24px;text-align:center;padding:0 4px}
+  .cal-d.today{box-shadow:none}
+  .cal-d.today b{background:#000;color:#fff;border-radius:var(--pill);font-weight:600}
+  .cal-d.sel{box-shadow:inset 0 0 0 2px #000}
+  .cal-d:hover{background:#FAFAFA}
+  .cal-d .ec{border-radius:5px}
+  .cal-d .ec.sp{border-radius:0}
+  .cal-d .ec.sp.st{border-radius:5px 0 0 5px}
+  .cal-d .ec.sp.en{border-radius:0 5px 5px 0}
+  .cal-d .plus{border-radius:50%}
+  .cal-lgd{border-top-color:var(--line)}
+  .cal-lgd i{border-radius:4px}
+  .yr-b{border-radius:6px}
+  .yr-head{background:var(--panel2)}
+
+  /* ── 주간업무 바 ── */
+  .bmeta{background:var(--panel2);border:none;border-radius:var(--r-l);padding:16px 22px}
+  .bm-t{font-size:18px}
+
+  /* ── 데일리뉴스 · 자료실 · 잠금 · 진단 ── */
+  .nwhero{border-radius:var(--r-xl);padding:36px 36px 32px;margin-bottom:16px}
+  .nwhero h2{font-family:var(--fd);font-size:40px;font-weight:600;letter-spacing:-.04em}
+  .nw-sum{background:#fff;border:none;border-radius:var(--r-l)}
+  .nw-day{border-top-color:#000}
+  .lib-site{background:#fff;border:none;border-radius:var(--r-m)}
+  .lib-site:hover{background:#fff;box-shadow:inset 0 0 0 1px #000}
+  .pin-box{background:var(--panel2);border:none;border-radius:var(--r-xl)}
+  .diag{border-radius:var(--r-l);border-left-width:1px}
+  .thumb{border-radius:var(--r-s)}
+
+  /* ── 창 · 알림 ── */
+  .sheet,.login-box{border-radius:var(--r-xl);overflow:hidden}
+  .sheet-hd{padding:28px 30px 24px}
+  .sheet-hd h3,.login-hd h2{font-size:24px}
+  .scrim{background:rgba(0,0,0,.55)}
+  .imgbox-close{border-radius:50%}
+
+  /* ── 지역별 날씨 창 ── */
+  .wx[role=button]{border-radius:var(--pill);padding:7px 14px;margin:0 -4px}
+  .wxalert{border-radius:var(--pill)}
+  .wxalert.none{padding:0 16px}
+  .gw-now .t{font-family:var(--fd);font-weight:500;font-size:56px;letter-spacing:-.04em}
+  .gw-now{border-bottom-color:#000}
+  .gw-grid{gap:6px;background:none;border:none}
+  .gw-grid div{background:var(--panel2);border-radius:var(--r-m)}
+  .gw-hours div{border-radius:var(--r-m)}
+  .gw-alert{border-radius:var(--r-m)}
+  .gw-results{border-radius:var(--r-m);overflow:hidden auto}
+
+  /* ── 푸터 ── */
+
+  @media (max-width:1180px){
+    .kpis.k4 .kpi:nth-child(n+3),.kpis.k5 .kpi:nth-child(n+3),.kpis.k3 .kpi:nth-child(n+3){border-top:none}
+  }
+  @media (max-width:900px){ .kpis.k2 .kpi:not(:first-child){border-top:none} }
+  @media (max-width:900px){
+    .bnav button .k{display:none}
+    .bnav button{border-radius:var(--pill)}
+  }
+  @media (max-width:640px){
+    :root{--gx:16px}
+    .tb-in{height:62px}
+    .bnav-outer{top:62px;margin-bottom:20px}
+    .bnav{padding-top:10px;padding-bottom:10px;gap:4px}
+    .bnav button{flex:none;padding:9px 14px 10px;min-width:0}
+    .bnav button .t{font-size:15px}
+    .bnav button .k{display:none}
+    .hero-in{padding-top:20px;padding-bottom:14px}
+    .hx-big{font-size:clamp(26px,8vw,34px)}
+    .hx-row{margin-top:12px;padding-top:10px}
+    .hero h1{font-size:16px}
+    .hx-crumb{display:block;margin:4px 0 0}
+    .kpis,.kpis.k1,.kpis.k2,.kpis.k3,.kpis.k4,.kpis.k5{gap:10px}
+    .kpi{border-radius:var(--r-l);padding:18px 18px 20px}
+    .kpi .lab{margin-bottom:16px;font-size:12px}
+    .kpi .v{font-size:34px} .kpis.k1 .v{font-size:48px}
+    .card{border-radius:var(--r-l);padding:22px 18px 22px}
+    .card h2{font-size:18px}
+    .nwhero{border-radius:var(--r-l);padding:24px 20px}
+    .nwhero h2{font-size:30px}
+  }
+</style>
+
 </head>
 <body>
 
@@ -825,7 +1097,7 @@ window.AI_CONFIG = {
       <img class="wordmark-logo" src="data:image/png;base64,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0p8zAAA8vmlUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSLvu78iIGlkPSJXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQiPz4KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyIgeDp4bXB0az0iQWRvYmUgWE1QIENvcmUgNS42LWMxMzggNzkuMTU5ODI0LCAyMDE2LzA5LzE0LTAxOjA5OjAxICAgICAgICAiPgogICA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgogICAgICA8cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0iIgogICAgICAgICAgICB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iCiAgICAgICAgICAgIHhtbG5zOnhtcE1NPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvbW0vIgogICAgICAgICAgICB4bWxuczpzdEV2dD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL3NUeXBlL1Jlc291cmNlRXZlbnQjIgogICAgICAgICAgICB4bWxuczpwaG90b3Nob3A9Imh0dHA6Ly9ucy5hZG9iZS5jb20vcGhvdG9zaG9wLzEuMC8iCiAgICAgICAgICAgIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyIKICAgICAgICAgICAgeG1sbnM6dGlmZj0iaHR0cDovL25zLmFkb2JlLmNvbS90aWZmLzEuMC8iCiAgICAgICAgICAgIHhtbG5zOmV4aWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20vZXhpZi8xLjAvIj4KICAgICAgICAgPHhtcDpDcmVhdG9yVG9vbD5BZG9iZSBQaG90b3Nob3AgQ0MgMjAxNyAoTWFjaW50b3NoKTwveG1wOkNyZWF0b3JUb29sPgogICAgICAgICA8eG1wOkNyZWF0ZURhdGU+MjAxNy0wNi0yOFQwOToxMDoxMyswOTowMDwveG1wOkNyZWF0ZURhdGU+CiAgICAgICAgIDx4bXA6TWV0YWRhdGFEYXRlPjIwMTctMDYtMjhUMTA6MTM6NDArMDk6MDA8L3htcDpNZXRhZGF0YURhdGU+CiAgICAgICAgIDx4bXA6TW9kaWZ5RGF0ZT4yMDE3LTA2LTI4VDEwOjEzOjQwKzA5OjAwPC94bXA6TW9kaWZ5RGF0ZT4KICAgICAgICAgPHhtcE1NOkluc3RhbmNlSUQ+eG1wLmlpZDozYmVjN2NhMi1mMmYxLTRkYmItYmIxYS1lNDY1NmQ4NjM5MmU8L3htcE1NOkluc3RhbmNlSUQ+CiAgICAgICAgIDx4bXBNTTpEb2N1bWVudElEPmFkb2JlOmRvY2lkOnBob3Rvc2hvcDo4NmQ1M2M0MC05YzI0LTExN2EtYTQ5My1hMjFjZDc5YWU1YWY8L3htcE1NOkRvY3VtZW50SUQ+CiAgICAgICAgIDx4bXBNTTpPcmlnaW5hbERvY3VtZW50SUQ+eG1wLmRpZDpiZThkN2I1Zi1mZGM3LTRmYWMtOTc3NC1jZDI4NDMxYWM3ZTE8L3htcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD4KICAgICAgICAgPHhtcE1NOkhpc3Rvcnk+CiAgICAgICAgICAgIDxyZGY6U2VxPgogICAgICAgICAgICAgICA8cmRmOmxpIHJkZjpwYXJzZVR5cGU9IlJlc291cmNlIj4KICAgICAgICAgICAgICAgICAgPHN0RXZ0OmFjdGlvbj5jcmVhdGVkPC9zdEV2dDphY3Rpb24+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDppbnN0YW5jZUlEPnhtcC5paWQ6YmU4ZDdiNWYtZmRjNy00ZmFjLTk3NzQtY2QyODQzMWFjN2UxPC9zdEV2dDppbnN0YW5jZUlEPgogICAgICAgICAgICAgICAgICA8c3RFdnQ6d2hlbj4yMDE3LTA2LTI4VDA5OjEwOjEzKzA5OjAwPC9zdEV2dDp3aGVuPgogICAgICAgICAgICAgICAgICA8c3RFdnQ6c29mdHdhcmVBZ2VudD5BZG9iZSBQaG90b3Nob3AgQ0MgMjAxNyAoTWFjaW50b3NoKTwvc3RFdnQ6c29mdHdhcmVBZ2VudD4KICAgICAgICAgICAgICAgPC9yZGY6bGk+CiAgICAgICAgICAgICAgIDxyZGY6bGkgcmRmOnBhcnNlVHlwZT0iUmVzb3VyY2UiPgogICAgICAgICAgICAgICAgICA8c3RFdnQ6YWN0aW9uPnNhdmVkPC9zdEV2dDphY3Rpb24+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDppbnN0YW5jZUlEPnhtcC5paWQ6MDhiYjI3OTMtNjIzMC00NjBhLTk1MjAtYmNmN2VhNWRhN2Y3PC9zdEV2dDppbnN0YW5jZUlEPgogICAgICAgICAgICAgICAgICA8c3RFdnQ6d2hlbj4yMDE3LTA2LTI4VDA5OjEwOjEzKzA5OjAwPC9zdEV2dDp3aGVuPgogICAgICAgICAgICAgICAgICA8c3RFdnQ6c29mdHdhcmVBZ2VudD5BZG9iZSBQaG90b3Nob3AgQ0MgMjAxNyAoTWFjaW50b3NoKTwvc3RFdnQ6c29mdHdhcmVBZ2VudD4KICAgICAgICAgICAgICAgICAgPHN0RXZ0OmNoYW5nZWQ+Lzwvc3RFdnQ6Y2hhbmdlZD4KICAgICAgICAgICAgICAgPC9yZGY6bGk+CiAgICAgICAgICAgICAgIDxyZGY6bGkgcmRmOnBhcnNlVHlwZT0iUmVzb3VyY2UiPgogICAgICAgICAgICAgICAgICA8c3RFdnQ6YWN0aW9uPnNhdmVkPC9zdEV2dDphY3Rpb24+CiAgICAgICAgICAgICAgICAgIDxzdEV2dDppbnN0YW5jZUlEPnhtcC5paWQ6M2JlYzdjYTItZjJmMS00ZGJiLWJiMWEtZTQ2NTZkODYzOTJlPC9zdEV2dDppbnN0YW5jZUlEPgogICAgICAgICAgICAgICAgICA8c3RFdnQ6d2hlbj4yMDE3LTA2LTI4VDEwOjEzOjQwKzA5OjAwPC9zdEV2dDp3aGVuPgogICAgICAgICAgICAgICAgICA8c3RFdnQ6c29mdHdhcmVBZ2VudD5BZG9iZSBQaG90b3Nob3AgQ0MgMjAxNyAoTWFjaW50b3NoKTwvc3RFdnQ6c29mdHdhcmVBZ2VudD4KICAgICAgICAgICAgICAgICAgPHN0RXZ0OmNoYW5nZWQ+Lzwvc3RFdnQ6Y2hhbmdlZD4KICAgICAgICAgICAgICAgPC9yZGY6bGk+CiAgICAgICAgICAgIDwvcmRmOlNlcT4KICAgICAgICAgPC94bXBNTTpIaXN0b3J5PgogICAgICAgICA8cGhvdG9zaG9wOkNvbG9yTW9kZT4zPC9waG90b3Nob3A6Q29sb3JNb2RlPgogICAgICAgICA8cGhvdG9zaG9wOklDQ1Byb2ZpbGU+c1JHQiBJRUM2MTk2Ni0yLjE8L3Bob3Rvc2hvcDpJQ0NQcm9maWxlPgogICAgICAgICA8cGhvdG9zaG9wOkRvY3VtZW50QW5jZXN0b3JzPgogICAgICAgICAgICA8cmRmOkJhZz4KICAgICAgICAgICAgICAgPHJkZjpsaT54bXAuZGlkOmU3MGQzM2Q1LTEyNzYtNDQzZS1hYThmLThkNDgwYWMyNWJiNjwvcmRmOmxpPgogICAgICAgICAgICA8L3JkZjpCYWc+CiAgICAgICAgIDwvcGhvdG9zaG9wOkRvY3VtZW50QW5jZXN0b3JzPgogICAgICAgICA8ZGM6Zm9ybWF0PmltYWdlL3BuZzwvZGM6Zm9ybWF0PgogICAgICAgICA8dGlmZjpPcmllbnRhdGlvbj4xPC90aWZmOk9yaWVudGF0aW9uPgogICAgICAgICA8dGlmZjpYUmVzb2x1dGlvbj4xNTAwMDAwLzEwMDAwPC90aWZmOlhSZXNvbHV0aW9uPgogICAgICAgICA8dGlmZjpZUmVzb2x1dGlvbj4xNTAwMDAwLzEwMDAwPC90aWZmOllSZXNvbHV0aW9uPgogICAgICAgICA8dGlmZjpSZXNvbHV0aW9uVW5pdD4yPC90aWZmOlJlc29sdXRpb25Vbml0PgogICAgICAgICA8ZXhpZjpDb2xvclNwYWNlPjE8L2V4aWY6Q29sb3JTcGFjZT4KICAgICAgICAgPGV4aWY6UGl4ZWxYRGltZW5zaW9uPjIxMDwvZXhpZjpQaXhlbFhEaW1lbnNpb24+CiAgICAgICAgIDxleGlmOlBpeGVsWURpbWVuc2lvbj43MDwvZXhpZjpQaXhlbFlEaW1lbnNpb24+CiAgICAgIDwvcmRmOkRlc2NyaXB0aW9uPgogICA8L3JkZjpSREY+CjwveDp4bXBtZXRhPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgIAo8P3hwYWNrZXQgZW5kPSJ3Ij8+coV99gAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAOK0lEQVR42uyde7AeRZnGfwfOCQmXELm4sCoQiVEQVkRcIQihlMu0WaBcFapiixCjxiguCSyLiCIKVIBKAu5CDBe5NZsCQQSUbkUEZAUWNhItRRABJTEbkGsgCbn7x7yfGSbT8803M+eEKt+nisr5untm+vb0e+m3m77169ejUCiaYTPtAoVCiaRQKJEUCiWSQqFQIikUSiSFQomkUCiRFAqFEkmhUCIpFEokhUKJpFAolEgKhRJJoVAiKRRKJIVCoURSKJRICoUSSaH4e0N/WWZfX180z5pkK2AUsBUwIMlrgBXAq8DLzoe13SpgTbIFsHlJkRXOh/W5Z/qBYSXPvOZ8WFe3U6xJ+oARVd/fpQ3rnQ8rmgxSl/bWfr+0c2tgJLClzIcBGceVMo4vOh9W1Xj3sJL51aTORe+tPN7WJJsD20qbh2fauxpYBix1PiwrrHTJ/Sb9PTZiZ+BE4Bhg9y7FV1uTPATcAFzpfFgaKbcT8ID8m8cZzodzCtKHAd8DPhJ554nAfzWYuycAV0TyZgCn59J2A34KvLWg/DprkrHOhyca1OcG4KNFYwscAvy8R/IcBnwK+BdZDLs9s0D6+yrnw+KKn9oOuByYEHnnCc6Hq2r0xUjgfmCM/L4MmFKhDYcCU4EjZNEoK/ss8BNp751VKtVXxrKORLImGQDOBE4WFnfwBLBAVq7tgT0iBDvJ+XBRScXnRDpjlPPh5cgzY4HHIq98ChjrfFhTc5X+NbBXpMhbiiaTNcl0YGbkmTnOh6k1V+C3A38AitSD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" alt="SIMMONS">
     </button>
     <span class="tb-sp"></span>
-    <div class="wx" id="wx" hidden>
+    <div class="wx" id="wx" hidden role="button" tabindex="0" title="눌러서 내 위치 · 다른 지역 날씨 보기">
       <span class="wx-loc" id="wxLoc"></span>
       <span class="wx-now"><span class="wx-ic" id="wxIcon"></span><b id="wxTemp">—</b></span>
       <span class="wx-desc" id="wxDesc"></span>
@@ -876,20 +1148,24 @@ window.AI_CONFIG = {
 <!-- ══════════ 히어로 ══════════ -->
 <div class="hero">
   <div class="hero-in">
-    <h1>안전보건 대시보드<span class="title-sub"><span id="todayTxt"></span></span></h1>
+    <p class="hx-big swap" id="hxBig" aria-hidden="true">Schedule</p>
+    <div class="hx-row">
+      <h1>안전보건 대시보드<span class="hx-crumb" id="hxCrumb"><b>월간 스케줄</b></span></h1>
+      <span class="hx-date" id="todayTxt"></span>
+    </div>
   </div>
 </div>
 
 <!-- ══════════ 탭 ══════════ -->
-<div class="bnav-outer">
+<div class="bnav-outer" id="bnavOuter">
   <nav class="bnav" role="group" aria-label="화면 전환">
-      <button data-tab="month"    aria-pressed="true"><span class="t">월간 스케줄</span></button>
-      <button data-tab="week"     aria-pressed="false"><span class="t">주간업무</span></button>
-      <button data-group="safety" aria-pressed="false"><span class="t">안전</span></button>
-      <button data-group="health" aria-pressed="false"><span class="t">보건</span></button>
-      <button data-group="env"    aria-pressed="false"><span class="t">환경</span></button>
-      <button data-tab="csa"      aria-pressed="false"><span class="t">중대재해처벌법</span></button>
-      <button data-group="common" aria-pressed="false"><span class="t">공통</span></button>
+      <button data-tab="month"    aria-pressed="true"><span class="t">Schedule</span><span class="k">월간 스케줄</span></button>
+      <button data-tab="week"     aria-pressed="false"><span class="t">Weekly</span><span class="k">주간업무</span></button>
+      <button data-group="safety" aria-pressed="false"><span class="t">Safety</span><span class="k">안전</span></button>
+      <button data-group="health" aria-pressed="false"><span class="t">Health</span><span class="k">보건</span></button>
+      <button data-group="env"    aria-pressed="false"><span class="t">Environment</span><span class="k">환경</span></button>
+      <button data-tab="csa"      aria-pressed="false"><span class="t">Compliance</span><span class="k">중대재해처벌법</span></button>
+      <button data-group="common" aria-pressed="false"><span class="t">Common</span><span class="k">공통</span></button>
   </nav>
   <div class="bnav-sub-outer" id="bnavSubOuter" hidden>
     <div class="bnav-sub" id="bnavSub"></div>
@@ -1378,6 +1654,29 @@ window.AI_CONFIG = {
   </div>
 </div>
 
+<!-- 지역별 날씨 (상단 날씨 클릭) -->
+<div class="scrim" id="gpsWxModal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="gpsWxTitle">
+    <div class="sheet-hd">
+      <p class="eyebrow">WEATHER</p>
+      <h3 id="gpsWxTitle">지역별 날씨</h3>
+    </div>
+    <div class="gw-bd">
+      <form class="gw-search" id="gwSearchForm">
+        <input type="search" id="gwSearchInput" placeholder="지역 검색 (예: 김해시, 해운대구, 모가면)" enterkeyhint="search">
+        <button class="reset go" type="submit">검색</button>
+        <button class="reset" type="button" id="btnGwMyLoc" title="현재 위치 날씨">📍 내 위치</button>
+      </form>
+      <div class="gw-results" id="gwResults" hidden></div>
+      <div id="gpsWxBody"></div>
+    </div>
+    <div class="sheet-ft" style="padding-top:0">
+      <div class="spacer"></div>
+      <button class="reset" id="btnGpsWxClose">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 데일리뉴스 AI 연결 설정 -->
 <div class="scrim" id="aiKeyEditor">
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="aiKeyTitle">
@@ -1446,17 +1745,17 @@ window.AI_CONFIG = {
  * ============================================================ */
 var CATS = ['안전', '보건', '환경', '기획'];
 var CATVAR = { '안전': 'var(--safe)', '보건': 'var(--health)', '환경': 'var(--env)', '기획': 'var(--plan)',
-  '개인업무': '#8A8A8A', '회의 및 행사': '#A8CDB3', '휴무': '#E8B4B2' };
+  '개인업무': '#9A9DA3', '회의 및 행사': '#8FB39B', '휴무': '#D6A28C' };
 var SCHEDULE_KINDS = ['개인업무', '회의 및 행사', '휴무'];
 /* ── 일정 구분 · 달력 칩 색 ──
    목록을 늘리려면 SCHEDULE_KINDS 에 이름을 추가하고
    SCH_STYLE 에 같은 이름으로 { bg 배경, fg 글자 } 를 넣으면 됩니다.
-   파스텔 배경 + 차콜 글자로 통일해 가독성과 톤을 맞춥니다. */
-var SCH_INK = '#2B2B2B';
+   채도를 낮춘 웜톤 파스텔 배경 + 웜 차콜 글자로 통일해 가독성과 톤을 맞춥니다. */
+var SCH_INK = '#2E2A26';
 var SCH_STYLE = {
-  '개인업무':    { bg: '#E2E2E2', fg: SCH_INK },  /* 라이트 그레이 */
-  '회의 및 행사': { bg: '#E2EFE6', fg: SCH_INK },  /* 연한 파스텔 그린 */
-  '휴무':        { bg: '#F8E6E5', fg: SCH_INK },  /* 연한 파스텔 레드 */
+  '개인업무':    { bg: '#E6E7E9', fg: SCH_INK },  /* 뉴트럴 그레이(살구색과 구분되도록 노란기 없이) */
+  '회의 및 행사': { bg: '#E1EBE4', fg: SCH_INK },  /* 세이지 그린 */
+  '휴무':        { bg: '#F4E4DC', fg: SCH_INK },  /* 소프트 클레이(살구) */
   /* 이전 자료 호환 */
   '안전': { bg: '#F8E6E5', fg: SCH_INK },
   '보건': { bg: '#D6E6F0', fg: SCH_INK },
@@ -2363,8 +2662,8 @@ var TAB_SHEETS = {
   accident:   ['안전사고(팩)', '안전사고(서울)'],
   budget:     ['예산']
 };
-var C = { safe: '#C0392B', health: '#4A4A4A', env: '#111111', plan: '#7A7A7A',
-          ink: '#111111', ink3: '#9B9B9B', brass: '#111111', store: '#2563C9', green: '#2E7D46' };
+var C = { safe: '#C0392B', health: '#4A4A4A', env: '#000000', plan: '#7A7A7A',
+          ink: '#000000', ink3: '#9B9B9B', brass: '#000000', store: '#2563C9', green: '#2E7D46' };
 
 function ds(name) { return (state.ds && state.ds[name]) || []; }
 function num(v) {
@@ -3821,7 +4120,7 @@ function renderHeaExamPage() {
     progressKpi('건강검진 상담 현황', csDone, cs.length, '대상 <b>' + cs.length + '명</b> 중 ' + csDone + '명', C.health);
 
   // 건강검진 현황 — 연도별 완료/예약/미예약 스택 (차트는 전체 자료 기준, 표만 필터 적용)
-  var SER = [{ c: '#111111', n: '검진완료' }, { c: C.plan, n: '검진예약' }, { c: C.safe, n: '검진미예약' }];
+  var SER = [{ c: '#000000', n: '검진완료' }, { c: C.plan, n: '검진예약' }, { c: C.safe, n: '검진미예약' }];
   var g = years.map(function (y) {
     var rs = ex.filter(function (r) { return String(r.연도) === y; });
     return { k: y, v: [rs.reduce(function (a, r) { return a + num(r['검진 완료']); }, 0),
@@ -3971,7 +4270,7 @@ function renderHeaEduPage() {
   $('heaEduKpi').innerHTML = progressKpi('교육 이수율', s, t,
     last ? (last + '년 대상 <b>' + nf(t) + '명</b> 중 ' + nf(s) + '명') : '', C.health);
 
-  var SER = [{ c: '#111111', n: '교육이수' }, { c: C.plan, n: '교육진행중' }, { c: C.safe, n: '교육미진행' }];
+  var SER = [{ c: '#000000', n: '교육이수' }, { c: C.plan, n: '교육진행중' }, { c: C.safe, n: '교육미진행' }];
   var g = years.map(function (y) {
     var rs = ed.filter(function (r) { return String(r.연도) === y; });
     return { k: y, v: [rs.reduce(function (a, r) { return a + num(r['교육 이수']); }, 0),
@@ -4749,34 +5048,327 @@ var WX_ICON = {
   snow:  '<path d="M7.5 15h9a3.8 3.8 0 0 0 .3-7.6 5.4 5.4 0 0 0-10.4 1A3.4 3.4 0 0 0 7.5 15z" fill="currentColor"/><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 19h.01M13 19h.01M17 19h.01M11 21.5h.01M15 21.5h.01"/></g>'
 };
 
+/** 내 위치 날씨를 확인하면 상단 바가 이 위치를 따라갑니다 { lat, lon, name } */
+var GPS_LOC = null;
+
+/** 상단 바 날씨 표시 — 사업장 날씨와 내 위치 날씨가 함께 씁니다 */
+function paintHeaderWx(d, name) {
+  var t = Math.round(d.current.temperature_2m);
+  var info = wxCode(d.current.weather_code);
+
+  $('wxLoc').textContent = name || '';
+  $('wx').classList.toggle('gps', !!GPS_LOC);
+  $('wxTemp').textContent = t + '°';
+  $('wxDesc').textContent = info[0];
+  $('wxIcon').innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + WX_ICON[info[1]] + '</svg>';
+
+  // 오늘 오전 9시 · 오후 3시 기온
+  var am = '', pm = '', day = String(d.current.time || '').slice(0, 10);
+  if (d.hourly && d.hourly.time) {
+    d.hourly.time.forEach(function (ts, i) {
+      if (day && ts.slice(0, 10) !== day) return;
+      if (ts.slice(11, 13) === '09') am = Math.round(d.hourly.temperature_2m[i]) + '°';
+      if (ts.slice(11, 13) === '15') pm = Math.round(d.hourly.temperature_2m[i]) + '°';
+    });
+  }
+  $('wxSub').textContent = (am ? '오전 ' + am : '') + (am && pm ? ' · ' : '') + (pm ? '오후 ' + pm : '');
+  $('wx').hidden = false;
+}
+
 function loadWeather() {
-  if (!WX.lat || !WX.lon || typeof fetch !== 'function') return;
+  if (typeof fetch !== 'function') return;
+  if (GPS_LOC) { refreshGpsHeader(); return; }   // 내 위치를 쓰는 중이면 그 위치로 갱신
+  if (!WX.lat || !WX.lon) return;
   var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + WX.lat + '&longitude=' + WX.lon +
     '&current=temperature_2m,weather_code&hourly=temperature_2m' +
     '&timezone=Asia%2FSeoul&forecast_days=1';
 
   fetch(url).then(function (r) { return r.json(); }).then(function (d) {
-    if (!d || !d.current) return;
-    var t = Math.round(d.current.temperature_2m);
-    var info = wxCode(d.current.weather_code);
-
-    $('wxLoc').textContent = WX.name || '';
-    $('wxTemp').textContent = t + '°';
-    $('wxDesc').textContent = info[0];
-    $('wxIcon').innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' + WX_ICON[info[1]] + '</svg>';
-
-    // 오전 9시 · 오후 3시 기온
-    var am = '', pm = '';
-    if (d.hourly && d.hourly.time) {
-      d.hourly.time.forEach(function (ts, i) {
-        if (ts.slice(11, 13) === '09') am = Math.round(d.hourly.temperature_2m[i]) + '°';
-        if (ts.slice(11, 13) === '15') pm = Math.round(d.hourly.temperature_2m[i]) + '°';
-      });
-    }
-    $('wxSub').textContent = (am ? '오전 ' + am : '') + (am && pm ? ' · ' : '') + (pm ? '오후 ' + pm : '');
-    $('wx').hidden = false;
+    if (!d || !d.current || GPS_LOC) return;
+    paintHeaderWx(d, WX.name);
   }).catch(function (e) {
     console.warn('[EHS] 날씨를 불러오지 못했습니다', e);   // 실패해도 화면은 그대로
+  });
+}
+
+/* ------------------------------------------------------------
+ *  지역별 날씨 창 (상단 날씨 클릭 · 현장근로자 플랫폼과 같은 방식)
+ *  · 📍 내 위치 : 브라우저 위치(GPS) → 상단 바도 그 위치를 따라갑니다
+ *  · 지역 검색 : 창에만 보여 주고 상단 날씨는 그대로 둡니다
+ *  위치 확인은 HTTPS(또는 localhost)에서만 동작합니다.
+ * ------------------------------------------------------------ */
+function gwMsg(html) { $('gpsWxBody').innerHTML = '<div class="gw-msg">' + html + '</div>'; }
+
+function openGpsWeather() {
+  $('gpsWxModal').classList.add('on');
+  $('gwResults').hidden = true;
+
+  if (!('geolocation' in navigator)) { gwMsg('이 기기(브라우저)는 위치 확인을 지원하지 않습니다.<br>위 검색창에서 지역을 찾아 보세요.'); return; }
+  if (!window.isSecureContext) { gwMsg('위치 확인은 보안 연결(https)에서만 가능합니다.<br>위 검색창에서 지역을 찾아 보세요.'); return; }
+
+  gwMsg('현재 위치를 확인하는 중입니다…<br><small>위치 권한을 묻는 창이 뜨면 <b>허용</b>을 눌러 주세요.</small>');
+  navigator.geolocation.getCurrentPosition(
+    function (pos) { loadGpsWeather(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy); },
+    function (err) {
+      var why = err.code === 1
+        ? '위치 권한이 거부되어 있습니다.<br>브라우저 주소창의 자물쇠 아이콘에서<br><b>위치 권한을 허용</b>한 뒤 다시 눌러 주세요.'
+        : err.code === 3 ? '위치 확인 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.'
+        : '현재 위치를 확인할 수 없습니다. 위치 서비스를 켜고 다시 시도해 주세요.';
+      gwMsg(why + '<br><br><button class="reset" id="btnGpsRetry">다시 시도</button>');
+      $('btnGpsRetry').onclick = openGpsWeather;
+    },
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60 * 1000 }
+  );
+}
+function closeGpsWeather() { $('gpsWxModal').classList.remove('on'); }
+
+/** 좌표 → 행정구역 정보 (약 1km 단위로 기억해 같은 곳을 반복 조회하지 않음). 실패하면 null */
+var GEO_CACHE = {};
+function revGeo(lat, lon) {
+  var k = lat.toFixed(2) + ',' + lon.toFixed(2);
+  if (GEO_CACHE[k]) return Promise.resolve(GEO_CACHE[k]);
+  return fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + lat + '&longitude=' + lon + '&localityLanguage=ko')
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (d) { return (GEO_CACHE[k] = d); })
+    .catch(function () { return null; });
+}
+
+/** 좌표 → 행정구역 이름 (실패하면 좌표로 표시) */
+function gpsPlaceName(lat, lon) {
+  return revGeo(lat, lon).then(function (d) {
+    var name = d ? [d.principalSubdivision, d.city, d.locality].filter(Boolean)
+      .filter(function (v, i, a) { return a.indexOf(v) === i; }).join(' ') : '';
+    return name || ('위도 ' + lat.toFixed(3) + ', 경도 ' + lon.toFixed(3));
+  });
+}
+
+/* 기상특보 띠 — 기상청 '특보 현황'(전국 발효 특보 문장)에서 창에 보이는 지역이
+ * 포함된 특보만 골라 그 지역 날씨 위에 흘려 보냅니다. 특보가 없으면 '특보 없음'을 고정 표시. */
+var KMA_KEY = WX.kmaKey || '';
+
+/** "경상남도" → ["경상남도","경남"], "서울특별시" → ["서울"], "전북특별자치도" → ["전북","전라북도"] */
+function provTokens(p) {
+  var fixed = { '전북특별자치도': ['전북', '전라북도'], '강원특별자치도': ['강원'],
+                '제주특별자치도': ['제주'], '세종특별자치시': ['세종'] };
+  if (fixed[p]) return fixed[p];
+  var core = p.replace(/(특별시|광역시|도)$/, '');
+  var short = { 경상남: '경남', 경상북: '경북', 전라남: '전남', 충청남: '충남', 충청북: '충북' }[core];
+  return short ? [core + '도', short] : [core];
+}
+
+/** 특보 문장 "o 호우경보 : 부산, 경상남도(김해시, 양산시)" → [{kind, groups:[{name, sub}]}] */
+function parseWrn(text) {
+  return String(text || '').split(/\r?\n/).map(function (l) { return l.trim().replace(/^o\s*/, ''); }).map(function (l) {
+    var i = l.indexOf(':');
+    if (i < 0) return null;
+    var kind = l.slice(0, i).trim(), groups = [], depth = 0, cur = '';
+    (l.slice(i + 1) + ',').split('').forEach(function (ch) {   // 괄호 밖의 쉼표로만 나눔
+      if (ch === '(') depth++;
+      if (ch === ')') depth--;
+      if (ch === ',' && depth === 0) {
+        var m = cur.trim().match(/^([^(]+)(?:\((.*)\))?$/);
+        if (m) groups.push({ name: m[1].trim(), sub: m[2] || '' });
+        cur = '';
+      } else cur += ch;
+    });
+    return { kind: kind, groups: groups };
+  }).filter(function (w) { return w && w.kind && w.kind !== '없음'; });
+}
+
+function loadWxAlerts(lat, lon, bar) {
+  if (!KMA_KEY || !bar) return;
+  var key = KMA_KEY.indexOf('%') >= 0 ? KMA_KEY : encodeURIComponent(KMA_KEY);   // Encoding/Decoding 키 모두 허용
+  Promise.all([
+    revGeo(lat, lon),
+    fetch('https://apis.data.go.kr/1360000/WthrWrnInfoService/getPwnStatus?serviceKey=' + key +
+      '&dataType=JSON&numOfRows=10&pageNo=1').then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+  ]).then(function (res) {
+    var geo = res[0], j = res[1];
+    if (!bar.isConnected || !geo) return;          // 그사이 다른 지역을 열었거나, 지역을 모르면 단정하지 않음
+    var items = j && j.response && j.response.body && j.response.body.items && j.response.body.items.item;
+    var it = (Array.isArray(items) ? items[0] : items) || {};
+
+    var prov = geo.principalSubdivision || '';
+    var metro = /(특별시|광역시|특별자치시)$/.test(prov);
+    var pt = provTokens(prov);
+    var cityCore = (geo.city || geo.locality || '').replace(/(시|군|구)$/, '');
+    var label = metro ? pt[0] : (pt[pt.length - 1] + ' ' + (geo.city || '')).trim();
+    var hasTok = function (s) { return pt.some(function (t) { return s.indexOf(t) >= 0; }); };
+
+    // 발효 중 특보: 도 전체 또는 해당 시·군이 포함된 것만 (광역시는 시 단위로 판단)
+    var hits = parseWrn(it.t6).filter(function (w) {
+      return w.groups.some(function (g) {
+        return hasTok(g.name) && (metro || !g.sub || (cityCore && g.sub.indexOf(cityCore) >= 0));
+      });
+    });
+    // 예비특보: 문장에 해당 도/시 이름이 들어 있으면 표시
+    var pre = String(it.t7 || '').split(/\r?\n/).map(function (l) { return l.trim().replace(/^\(\d+\)\s*/, ''); })
+      .filter(function (l) {
+        return l && l.replace(/\s/g, '') !== 'o없음' && (hasTok(l) || (cityCore && l.indexOf(cityCore) >= 0));
+      });
+
+    var tm = String(it.tmFc || '');
+    var when = tm.length >= 12 ? ' (기상청 ' + (+tm.slice(4, 6)) + '/' + (+tm.slice(6, 8)) + ' ' + tm.slice(8, 10) + ':' + tm.slice(10, 12) + ' 발표)' : '';
+    var kinds = [];
+    hits.forEach(function (w) { if (kinds.indexOf(w.kind) < 0) kinds.push(w.kind); });
+    var msgs = [];
+    if (hits.length) msgs.push('⚠ [기상특보] ' + label + ' — ' + kinds.join(', ') + ' 발효 중' + when);
+    pre.forEach(function (l) { msgs.push('[예비특보] ' + l); });
+    if (msgs.length) msgs.push('운전 · 하역 작업 시 각별히 주의하세요');
+    showWxAlert(bar, msgs, hits.some(function (w) { return /경보/.test(w.kind); }), '✓ ' + label + ' — 발효 중인 기상특보 없음' + when);
+  }).catch(function (e) {
+    console.warn('[EHS] 기상특보 조회 실패', e);    // 실패하면 띠를 숨긴 채로 둠
+  });
+}
+
+/** 특보가 있으면 흐르는 띠, 없으면 noneText 를 차분한 띠로 고정 표시 */
+function showWxAlert(bar, msgs, severe, noneText) {
+  var trk = bar.querySelector('.trk');
+  var none = !msgs.length;
+  trk.textContent = none ? noneText : msgs.join('     ◆     ');
+  trk.style.animationDuration = Math.max(14, Math.round(trk.textContent.length * 0.28)) + 's';  // 길이에 맞춰 같은 속도로
+  bar.classList.toggle('none', none);
+  bar.classList.toggle('mild', !none && !severe);
+  bar.hidden = false;
+}
+
+function gpsForecast(lat, lon) {
+  return fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+    '&current=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m' +
+    '&hourly=temperature_2m,weather_code,precipitation_probability' +
+    '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max' +
+    '&wind_speed_unit=ms&timezone=Asia%2FSeoul&forecast_days=2')
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+}
+
+/** 상단 바용 짧은 이름: "경상남도 김해시 내동" → "📍 김해시 내동" */
+function gpsShortName(place) { return '📍 ' + place.split(' ').slice(-2).join(' '); }
+
+/** 30분마다(loadWeather) 현재 위치를 다시 잡아 상단 바를 갱신합니다.
+ *  이미 권한을 받은 상태라 다시 묻지 않으며, 위치를 못 잡으면 마지막 위치로 갱신합니다. */
+function refreshGpsHeader() {
+  var paint = function (lat, lon) {
+    Promise.all([gpsPlaceName(lat, lon), gpsForecast(lat, lon)]).then(function (res) {
+      GPS_LOC = { lat: lat, lon: lon, name: res[0] };
+      paintHeaderWx(res[1], gpsShortName(res[0]));
+    }).catch(function () {});
+  };
+  navigator.geolocation.getCurrentPosition(
+    function (pos) { paint(pos.coords.latitude, pos.coords.longitude); },
+    function () { paint(GPS_LOC.lat, GPS_LOC.lon); },
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 5 * 60 * 1000 });
+}
+
+/* 지역 검색 (OpenStreetMap Nominatim · 키 불필요 · 초당 1회 이내로만 호출) */
+function searchWxPlace(q) {
+  q = String(q || '').trim();
+  var box = $('gwResults');
+  if (!q) { $('gwSearchInput').focus(); return; }
+  box.hidden = false;
+  box.innerHTML = '<div class="gw-msg" style="padding:14px 0">검색 중…</div>';
+  fetch('https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) +
+    '&format=jsonv2&countrycodes=kr&accept-language=ko&limit=10')
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (rows) {
+      // 시 · 군 · 구 · 읍 · 면 · 동 같은 행정구역을 학교 · 역 같은 장소보다 위에
+      var AREA = ['province', 'state', 'city', 'county', 'borough', 'municipality', 'city_district',
+                  'district', 'town', 'village', 'suburb', 'quarter', 'neighbourhood', 'hamlet'];
+      var seen = {};
+      var list = rows.map(function (p) {
+        var parts = p.display_name.split(', ').filter(function (s) { return s !== '대한민국' && !/^\d{5}$/.test(s); });
+        return { lat: +p.lat, lon: +p.lon, name: p.name, area: AREA.indexOf(p.addresstype) >= 0 ? 1 : 0,
+                 label: parts.reverse().join(' ') };
+      }).filter(function (p) { if (seen[p.label]) return false; seen[p.label] = 1; return true; })
+        .sort(function (a, b) { return b.area - a.area; });
+      if (!list.length) {
+        box.innerHTML = '<div class="gw-msg" style="padding:14px">검색 결과가 없습니다.<br>시 · 군 · 구나 읍 · 면 · 동 이름으로 검색해 보세요.</div>';
+        return;
+      }
+      box.innerHTML = list.map(function (p, i) {
+        return '<button type="button" data-i="' + i + '">' + esc(p.name) + '<small>' + esc(p.label) + '</small></button>';
+      }).join('');
+      Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
+        b.onclick = function () {
+          var p = list[+b.dataset.i];
+          box.hidden = true;
+          loadGpsWeather(p.lat, p.lon, 0, p.label);
+        };
+      });
+    })
+    .catch(function () {
+      box.innerHTML = '<div class="gw-msg" style="padding:14px">검색하지 못했습니다. 잠시 후 다시 시도해 주세요.</div>';
+    });
+}
+
+/** picked 가 있으면 검색한 지역 — 창에만 보여 주고 상단 날씨는 그대로 둡니다 */
+function loadGpsWeather(lat, lon, acc, picked) {
+  var body = $('gpsWxBody');
+  gwMsg('날씨를 불러오는 중입니다…');
+  Promise.all([picked || gpsPlaceName(lat, lon), gpsForecast(lat, lon)]).then(function (res) {
+    var place = res[0], d = res[1];
+    if (!picked) {
+      GPS_LOC = { lat: lat, lon: lon, name: place };
+      paintHeaderWx(d, gpsShortName(place));
+    }
+    var c = d.current, dy = d.daily;
+    var cur = Math.round(c.temperature_2m);
+    var feels = Math.round(c.apparent_temperature != null ? c.apparent_temperature : cur);
+    var wind = Math.round((c.wind_speed_10m || 0) * 10) / 10;
+    var pop = Math.round(dy.precipitation_probability_max[0] || 0);
+    var uv = Math.round(dy.uv_index_max[0] || 0);
+    var sky = wxCode(c.weather_code)[0];
+
+    // 지금부터 6시간 (1시간 단위)
+    var now = c.time.slice(0, 13);
+    var i0 = Math.max(0, d.hourly.time.map(function (t) { return t.slice(0, 13); }).indexOf(now));
+    var hours = d.hourly.time.slice(i0 + 1, i0 + 7).map(function (t, k) {
+      var i = i0 + 1 + k;
+      return '<div><span>' + (+t.slice(11, 13)) + '시</span><b>' + Math.round(d.hourly.temperature_2m[i]) + '°</b>' +
+        '<span>' + esc(wxCode(d.hourly.weather_code[i])[0]) + '</span>' +
+        '<br><span style="color:var(--ink3)">☂ ' + (d.hourly.precipitation_probability[i] || 0) + '%</span></div>';
+    }).join('');
+
+    // 작업 안전 주의 문구
+    var code = c.weather_code, alerts = [];
+    if (feels >= 33) alerts.push('폭염 주의 — 물 · 그늘 · 휴식을 지키고 무리한 상하차 작업을 피하세요.');
+    else if (feels >= 31) alerts.push('더위 주의 — 수분을 자주 보충하세요.');
+    if (feels <= -10) alerts.push('한파 주의 — 방한구 착용, 결빙 구간 미끄럼에 주의하세요.');
+    if ([71, 73, 75, 77, 85, 86].indexOf(code) >= 0) alerts.push('눈 — 노면 결빙 · 감속 운전, 하역 시 미끄럼 주의.');
+    else if ((c.precipitation || 0) > 0 || pop >= 60) alerts.push('비 예보 — 빗길 감속 운전, 제품 · 적재함 방수 확인.');
+    if ([95, 96, 99].indexOf(code) >= 0) alerts.push('뇌우 — 야외 작업을 멈추고 안전한 곳으로 대피하세요.');
+    if (wind >= 10) alerts.push('강풍(' + wind + 'm/s) — 대형 매트리스 등 판형 화물 하역 시 바람에 주의하세요.');
+    if (code === 45 || code === 48) alerts.push('안개 — 전조등을 켜고 차간 거리를 넉넉히 두세요.');
+
+    body.innerHTML =
+      '<a class="wxalert" href="https://www.weather.go.kr/w/special-report/overall.do" target="_blank"' +
+      ' rel="noopener" title="기상청 특보 현황 보기" hidden><span class="trk"></span></a>' +
+      '<p class="gw-loc">' + (picked ? '🔍' : '📍 내 위치 ·') + ' ' + esc(place) + (acc > 1000 ? ' (대략적 위치)' : '') + '</p>' +
+      '<div class="gw-now">' +
+        '<span class="t num">' + cur + '°</span>' +
+        '<span class="sky">' + esc(sky) + '</span>' +
+        '<span class="fl num">체감 ' + feels + '° · 최고 ' + Math.round(dy.temperature_2m_max[0]) + '° / 최저 ' + Math.round(dy.temperature_2m_min[0]) + '°</span>' +
+      '</div>' +
+      '<div class="gw-grid">' +
+        '<div><span class="k">습도</span><span class="v num">' + Math.round(c.relative_humidity_2m || 0) + '%</span></div>' +
+        '<div><span class="k">바람</span><span class="v num">' + wind + 'm/s</span></div>' +
+        '<div><span class="k">강수확률</span><span class="v num">' + pop + '%</span></div>' +
+        '<div><span class="k">현재 강수량</span><span class="v num">' + (c.precipitation || 0) + 'mm</span></div>' +
+        '<div><span class="k">자외선</span><span class="v num">' + uv + '</span></div>' +
+        '<div><span class="k">기준 시각</span><span class="v num">' + c.time.slice(11, 16) + '</span></div>' +
+      '</div>' +
+      '<p class="secttl" style="margin:0 0 10px">앞으로 6시간</p>' +
+      '<div class="gw-hours">' + hours + '</div>' +
+      alerts.map(function (a) { return '<p class="gw-alert">⚠ ' + esc(a) + '</p>'; }).join('') +
+      '<div class="gw-foot">' +
+        '<span>기상 자료: Open-Meteo' + (picked ? '<br>검색한 지역 날씨입니다 (상단 날씨는 그대로)' : '') + '</span>' +
+        '<button class="reset" id="btnGpsRefresh">새로고침</button>' +
+      '</div>';
+    $('btnGpsRefresh').onclick = picked ? function () { loadGpsWeather(lat, lon, acc, picked); } : openGpsWeather;
+    loadWxAlerts(lat, lon, body.querySelector('.wxalert'));
+  }).catch(function () {
+    gwMsg('날씨 정보를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.' +
+      '<br><br><button class="reset" id="btnGpsRetry">다시 시도</button>');
+    $('btnGpsRetry').onclick = function () { loadGpsWeather(lat, lon, acc, picked); };
   });
 }
 
@@ -5961,7 +6553,10 @@ var NAV_GROUPS = {
     { tab: 'accident', label: '안전사고' },
     { tab: 'budget', label: '예산' },
     { tab: 'library', label: '자료실' },
-    { tab: 'news', label: '데일리뉴스' }
+    { tab: 'news', label: '데일리뉴스' },
+    // href가 있는 항목은 게시판 탭이 아니라 외부 사이트(새 창)로 연결됩니다.
+    { href: 'https://ai-assist.kosha.or.kr/law/', label: 'AI 어드바이저' },
+    { href: 'https://ai-assist.kosha.or.kr/mfg/', label: 'AI 위험요인 사진 업로드' }
   ] },
   safety: { label: '안전', sub: [
     { tab: 'safinspect', label: '안전점검' },
@@ -5987,18 +6582,30 @@ function groupOf(t) {
   for (var g in NAV_GROUPS) if (NAV_GROUPS[g].sub.some(function (s) { return s.tab === t; })) return g;
   return null;
 }
-function renderNavSub(t) {
+/** 두 번째 줄 : 선택된 탭의 그룹을 그리되, 마우스가 다른 그룹 탭 위에 있으면(hoverGroup) 그 그룹을 미리 보여줍니다. */
+function renderNavSub(t, hoverGroup) {
   var g = groupOf(t);
   document.querySelectorAll('.bnav button[data-group]').forEach(function (x) {
     x.setAttribute('aria-pressed', String(x.dataset.group === g));
   });
-  $('bnavSubOuter').hidden = !g;
-  if (!g) { $('bnavSub').innerHTML = ''; return; }
-  var group = NAV_GROUPS[g];
+  var show = hoverGroup || g;
+  $('bnavSubOuter').hidden = !show;
+  if (!show) { $('bnavSub').innerHTML = ''; return; }
+  var group = NAV_GROUPS[show];
   $('bnavSub').innerHTML = '<span class="lbl">' + esc(group.label) + '</span>' +
-    group.sub.map(function (s) {
-      return '<button data-tab="' + s.tab + '" aria-pressed="' + (s.tab === t) + '">' + esc(s.label) + '</button>';
-    }).join('');
+    group.sub.map(subItemHtml).join('');
+}
+function subItemHtml(s) {
+  if (s.href) return '<a class="ext" href="' + esc(s.href) + '" target="_blank" rel="noopener noreferrer">' + esc(s.label) + ' ↗</a>';
+  return '<button data-tab="' + s.tab + '" aria-pressed="' + (s.tab === state.tab) + '">' + esc(s.label) + '</button>';
+}
+/** 탭에 마우스를 올리면 그 탭을 회색 알약으로 표시하고, 그룹 탭이면 두 번째 줄에 하위 메뉴를 보여줍니다. */
+var navHoverBtn = null;
+function setNavHover(b) {
+  if (b === navHoverBtn) return;
+  navHoverBtn = b;
+  document.querySelectorAll('.bnav > button').forEach(function (x) { x.classList.toggle('hov', x === b); });
+  renderNavSub(state.tab, b && b.dataset.group);
 }
 function activateTab(t) {
   state.tab = t;
@@ -6014,6 +6621,18 @@ function activateTab(t) {
 }
 
 function bind() {
+  var navOuter = $('bnavOuter');
+  // 두 번째 줄로 내려가는 동안에는 미리보기를 유지하고, 탭 바 전체를 벗어나면 선택된 탭으로 되돌립니다.
+  navOuter.addEventListener('mouseover', function (e) {
+    var b = e.target.closest('.bnav > button');
+    if (b) setNavHover(b);
+  });
+  navOuter.addEventListener('mouseleave', function () { setNavHover(null); });
+  // 게시판을 고르면 미리보기를 끝내고 실제 선택 상태로 맞춥니다.
+  navOuter.addEventListener('click', function (e) {
+    if (e.target.closest('[data-tab], a.ext')) setNavHover(null);
+  });
+
   // data-tab 버튼은 "공통 · 안전" 두 번째 줄(#bnavSub)에서 매번 새로 그려지므로,
   // .bnav 안으로 범위를 좁히지 않고 문서 전체에 위임합니다.
   document.addEventListener('click', function (e) {
@@ -6246,6 +6865,7 @@ function bind() {
     if (e.key === 'Escape' && $('popupEditor').classList.contains('on')) closePopupEditor();
     if (e.key === 'Escape' && $('aiKeyEditor').classList.contains('on')) closeAiKeyEditor();
     if (e.key === 'Escape' && $('dayPopup').classList.contains('on')) closeDayPopup();
+    if (e.key === 'Escape' && $('gpsWxModal').classList.contains('on')) closeGpsWeather();
     if (e.key === 'Enter' && e.target && e.target.id === 'heaExamPin') { e.preventDefault(); tryHeaExamPin(); }
   });
 
@@ -6310,6 +6930,14 @@ function bind() {
   $('btnPopupClose').onclick = function () { $('homePopup').classList.remove('on'); };
   $('btnDayPopupClose').onclick = closeDayPopup;
   bindOverlayClose($('dayPopup'), closeDayPopup);
+
+  // 상단 날씨 → 지역별 날씨 창
+  $('wx').onclick = openGpsWeather;
+  $('wx').onkeydown = function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openGpsWeather(); } };
+  $('btnGwMyLoc').onclick = openGpsWeather;
+  $('gwSearchForm').onsubmit = function (e) { e.preventDefault(); searchWxPlace($('gwSearchInput').value); };
+  $('btnGpsWxClose').onclick = closeGpsWeather;
+  bindOverlayClose($('gpsWxModal'), closeGpsWeather);
   $('btnDelete').onclick = function () {
     if (!state.edit || !state.edit.id) return;
     var kind = state.edit.kind, id = state.edit.id;
@@ -6423,5 +7051,50 @@ function bindLogin() {
   });
 })();
 </script>
+<script>
+/* ══════════ HYBE 히어로 : 열려 있는 게시판에 맞춰 큰 영문 제목을 바꿉니다 ══════════ */
+(function () {
+  var NAMES = {
+    month: ['Schedule', '월간 스케줄'], week: ['Weekly', '주간업무'],
+    kpi: ['KPI', 'KPI'], accident: ['Accident', '안전사고'], budget: ['Budget', '예산'],
+    library: ['Library', '자료실'], news: ['Daily News', '데일리뉴스'],
+    safinspect: ['Inspection', '안전점검'], safrisk: ['Risk Assessment', '위험성평가'],
+    safmeet: ['Committee', '회의체'], edu: ['Training', '교육'], safdevice: ['Safety Device', '안전장치'],
+    heaact: ['Wellness', '보건활동'], heaexam: ['Check-up', '건강검진/상담'],
+    heaenv: ['Work Environment', '작업환경측정'], heaedu: ['Health Training', '정기교육'],
+    envwaste: ['Waste', '폐기물'], envghg: ['Emissions', '온실가스'],
+    envwater: ['Wastewater', '오수처리'], envair: ['Air Quality', '대기오염'],
+    csa: ['Compliance', '중대재해처벌법'], qse: ['Contractor Review', '적격수급인평가']
+  };
+  var GROUP = {
+    safinspect: '안전', safrisk: '안전', safmeet: '안전', edu: '안전', safdevice: '안전',
+    heaact: '보건', heaexam: '보건', heaenv: '보건', heaedu: '보건',
+    envwaste: '환경', envghg: '환경', envwater: '환경', envair: '환경',
+    kpi: '공통', accident: '공통', budget: '공통', library: '공통', news: '공통',
+    qse: '중대재해처벌법'
+  };
+  var big = document.getElementById('hxBig'), crumb = document.getElementById('hxCrumb');
+  if (!big || !crumb) return;
+  var cur = null;
+  function sync() {
+    var p = document.querySelector('.bpanel:not([hidden])');
+    var id = p ? p.id.replace(/^bd-/, '') : 'month';
+    if (id === cur) return;
+    cur = id;
+    var n = NAMES[id] || ['Safety & Health', ''];
+    big.textContent = n[0];
+    big.classList.remove('swap'); void big.offsetWidth; big.classList.add('swap');
+    crumb.innerHTML = GROUP[id]
+      ? GROUP[id] + ' / <b>' + n[1] + '</b>'
+      : '<b>' + n[1] + '</b>';
+  }
+  var mo = new MutationObserver(sync);
+  document.querySelectorAll('.bpanel').forEach(function (el) {
+    mo.observe(el, { attributes: true, attributeFilter: ['hidden'] });
+  });
+  sync();
+})();
+</script>
+
 </body>
 </html>
