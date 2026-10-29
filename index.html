@@ -5890,6 +5890,7 @@ function deleteLib(id) {
  *             화면도 열릴 때마다 한 번 더 지운 뒤 6개월 이내 건만 보여줍니다.
  * ============================================================ */
 var VISIT_LOG_PIN = '1004';
+var VISIT_DEL_PIN = '8587';   // 방문 기록 삭제 시 한 번 더 묻는 비밀번호
 var VISIT_KEEP_MONTHS = 6;
 var VISIT_ROWS = [];
 var VISIT_LOG_UNLOCKED = false;
@@ -5994,7 +5995,9 @@ function renderVisitLog() {
     }), 860);
 }
 function deleteVisit(id) {
-  if (!confirm('이 방문 기록을 삭제할까요?')) return;
+  var pin = prompt('이 방문 기록을 삭제하려면 삭제 비밀번호를 입력하세요.');
+  if (pin === null) return;
+  if (pin.trim() !== VISIT_DEL_PIN) { toast('삭제 비밀번호가 올바르지 않습니다.', 'err'); return; }
   RPC.db.from('visit_pledges').delete().eq('id', id)
     .then(function (res) { if (res.error) throw res.error; toast('삭제했습니다.'); loadVisitLog(); })
     .catch(function (e) { toast('삭제 실패: ' + ((e && e.message) || e), 'err'); });
