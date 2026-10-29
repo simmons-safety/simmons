@@ -748,6 +748,8 @@ window.AI_CONFIG = {
   .vs-frame{display:block;width:100%;max-width:720px;height:2200px;margin:0 auto;border:0;background:transparent}
   .vs-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .vs-tools input[type=search]{flex:1;min-width:200px}
+  .vs-bar{display:flex;justify-content:flex-end;max-width:720px;margin:0 auto 4px}
+  .vs-bar.vs-bar-l{justify-content:flex-start;max-width:none;margin-bottom:12px}
 
   /* ══════════ 주간업무 ══════════ */
   .bmeta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
@@ -1530,12 +1532,18 @@ window.AI_CONFIG = {
 
   <!-- ══════════ 방문 서약서 (구글폼 "시몬스 방문 안전 서약서 서명" 대체) ══════════ -->
   <section class="bpanel" id="bd-visit" hidden>
+    <div class="vs-bar">
+      <button class="reset" data-tab="visitlog">🔒 방문 기록대장 보기</button>
+    </div>
     <!-- QR로 여는 방문자 페이지(visit.html)를 그대로 보여 줍니다. 내용을 고칠 때는 visit.html 하나만 고치면 됩니다. -->
     <iframe id="vsFrame" class="vs-frame" title="시몬스 방문 안전 서약서" data-src="visit.html?embed=1"></iframe>
   </section>
 
   <!-- ══════════ 방문 기록대장 (비밀번호 보호 · 6개월 보관) ══════════ -->
   <section class="bpanel" id="bd-visitlog" hidden>
+    <div class="vs-bar vs-bar-l">
+      <button class="reset" data-tab="visit">← 방문 서약서로 돌아가기</button>
+    </div>
     <div id="visitLogGate"></div>
     <div id="visitLogBody" hidden>
       <div class="kpis k3" id="visitLogKpi"></div>
@@ -6717,7 +6725,6 @@ var NAV_GROUPS = {
     { tab: 'library', label: '자료실' },
     { tab: 'news', label: '데일리뉴스' },
     { tab: 'visit', label: '방문 서약서' },
-    { tab: 'visitlog', label: '방문 기록대장' },
     // href가 있는 항목은 게시판 탭이 아니라 외부 사이트(새 창)로 연결됩니다.
     { href: 'https://ai-assist.kosha.or.kr/law/', label: 'AI 어드바이저' },
     { href: 'https://ai-assist.kosha.or.kr/mfg/', label: 'AI 위험요인 사진 업로드' }
@@ -6742,7 +6749,10 @@ var NAV_GROUPS = {
     { tab: 'envair', label: '대기오염' }
   ] }
 };
+/** 메뉴에는 없고 다른 게시판 안의 버튼으로 들어가는 탭 → 메뉴에서 대신 켜 둘 게시판 */
+var NAV_PARENT = { visitlog: 'visit' };
 function groupOf(t) {
+  t = NAV_PARENT[t] || t;
   for (var g in NAV_GROUPS) if (NAV_GROUPS[g].sub.some(function (s) { return s.tab === t; })) return g;
   return null;
 }
@@ -6761,7 +6771,7 @@ function renderNavSub(t, hoverGroup) {
 }
 function subItemHtml(s) {
   if (s.href) return '<a class="ext" href="' + esc(s.href) + '" target="_blank" rel="noopener noreferrer">' + esc(s.label) + ' ↗</a>';
-  return '<button data-tab="' + s.tab + '" aria-pressed="' + (s.tab === state.tab) + '">' + esc(s.label) + '</button>';
+  return '<button data-tab="' + s.tab + '" aria-pressed="' + (s.tab === (NAV_PARENT[state.tab] || state.tab)) + '">' + esc(s.label) + '</button>';
 }
 /** 탭에 마우스를 올리면 그 탭을 회색 알약으로 표시하고, 그룹 탭이면 두 번째 줄에 하위 메뉴를 보여줍니다. */
 var navHoverBtn = null;
