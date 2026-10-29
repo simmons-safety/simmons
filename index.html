@@ -7,7 +7,6 @@
 <link rel="icon" href="data:,">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-
 <!-- ══════════════════════════════════════════════════════════
      SETTINGS · 여기 세 줄만 고치면 됩니다
      · 반드시 "메모장"으로 여세요. 워드/한글로 고치면 따옴표가
@@ -744,6 +743,11 @@ window.AI_CONFIG = {
   .pin-row input:focus{outline:1px solid var(--ink);outline-offset:-1px}
   .pin-row button{flex:none;padding:10px 16px}
   .pin-err{color:var(--human) !important;margin-top:10px !important}
+
+  /* ══════════ 방문 서약서 · 기록대장 ══════════ */
+  .vs-frame{display:block;width:100%;max-width:720px;height:2200px;margin:0 auto;border:0;background:transparent}
+  .vs-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .vs-tools input[type=search]{flex:1;min-width:200px}
 
   /* ══════════ 주간업무 ══════════ */
   .bmeta{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;
@@ -1524,6 +1528,29 @@ window.AI_CONFIG = {
     </div>
   </section>
 
+  <!-- ══════════ 방문 서약서 (구글폼 "시몬스 방문 안전 서약서 서명" 대체) ══════════ -->
+  <section class="bpanel" id="bd-visit" hidden>
+    <!-- QR로 여는 방문자 페이지(visit.html)를 그대로 보여 줍니다. 내용을 고칠 때는 visit.html 하나만 고치면 됩니다. -->
+    <iframe id="vsFrame" class="vs-frame" title="시몬스 방문 안전 서약서" data-src="visit.html?embed=1"></iframe>
+  </section>
+
+  <!-- ══════════ 방문 기록대장 (비밀번호 보호 · 6개월 보관) ══════════ -->
+  <section class="bpanel" id="bd-visitlog" hidden>
+    <div id="visitLogGate"></div>
+    <div id="visitLogBody" hidden>
+      <div class="kpis k3" id="visitLogKpi"></div>
+      <div class="card">
+        <header><h2>방문 기록대장</h2><span class="note">수집일로부터 6개월 경과 시 자동 삭제</span></header>
+        <div class="vs-tools">
+          <input type="search" id="vsLogQ" placeholder="이름 · 업체명 · 연락처 · 차량번호 검색">
+          <input type="date" id="vsLogFrom" title="제출일 시작"><span class="dim">~</span><input type="date" id="vsLogTo" title="제출일 끝">
+          <button class="reset" id="btnVisitXlsx">엑셀 다운로드</button>
+        </div>
+        <div id="visitLogList" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ══════════ 데일리뉴스 ══════════ -->
   <section class="bpanel" id="bd-news" hidden>
     <div class="nwhero">
@@ -2108,7 +2135,7 @@ function closeLightbox() { $('imgbox').classList.remove('on'); $('imgboxImg').sr
  * ============================================================ */
 function renderAll() { renderHeader(); renderMonthPanel(); renderWeekPanel(); }
 
-function renderInitial() { renderAll(); renderDataTabs(); renderCsaDashboard(); renderCsaTable(); initQseForm(); renderLibSites(); renderLibList(); renderNews(); }
+function renderInitial() { renderAll(); renderDataTabs(); renderCsaDashboard(); renderCsaTable(); initQseForm(); renderLibSites(); renderLibList(); renderVisitLog(); renderNews(); }
 
 function renderHeader() {
   var t = new Date();
@@ -5846,6 +5873,140 @@ function deleteLib(id) {
 }
 
 /* ============================================================
+ *  6-6-2. 방문 서약서 · 방문 기록대장
+ *
+ *  · 서약서 : 구글폼 "시몬스 방문 안전 서약서 서명"과 같은 내용을 이 화면에서 받아
+ *             visit_pledges 표에 저장합니다. (schema_visit.sql 실행 필요)
+ *  · 기록대장 : 비밀번호로 잠근 제출 목록. 개인정보 보유기간 때문에
+ *             수집일로부터 6개월이 지난 건은 서버(pg_cron)가 매일 지우고,
+ *             화면도 열릴 때마다 한 번 더 지운 뒤 6개월 이내 건만 보여줍니다.
+ * ============================================================ */
+var VISIT_LOG_PIN = '0000';
+var VISIT_KEEP_MONTHS = 6;
+var VISIT_ROWS = [];
+var VISIT_LOG_UNLOCKED = false;
+
+function visitCutoff() {
+  var d = new Date(); d.setMonth(d.getMonth() - VISIT_KEEP_MONTHS);
+  return d;
+}
+function visitPurgeDate(createdAt) {
+  var d = new Date(createdAt); d.setMonth(d.getMonth() + VISIT_KEEP_MONTHS);
+  return ymd(d);
+}
+function fmtDateTime(s) {
+  var d = new Date(s);
+  return ymd(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+/** 방문 서약서 탭을 처음 열 때 visit.html 을 불러옵니다. (숨은 탭에서 미리 불러오지 않도록) */
+function openVisitFrame() {
+  var f = $('vsFrame');
+  if (f && !f.getAttribute('src')) f.setAttribute('src', f.dataset.src);
+}
+
+/** 6개월이 지난 건을 지우고(서버 자동 삭제의 보조), 6개월 이내 건만 다시 읽어 옵니다. */
+function loadVisitLog() {
+  if (!RPC.live) { VISIT_ROWS = []; renderVisitLog(); return Promise.resolve(); }
+  var cut = visitCutoff().toISOString();
+  return RPC.db.from('visit_pledges').delete().lt('created_at', cut)
+    .then(function (res) { if (res.error) console.warn('[EHS] 방문기록 기한 경과분 삭제 실패', res.error); })
+    .then(function () {
+      return RPC.db.from('visit_pledges').select('*').gte('created_at', cut)
+        .order('created_at', { ascending: false }).limit(5000);
+    })
+    .then(function (res) {
+      if (res.error) throw res.error;
+      VISIT_ROWS = res.data || [];
+      renderVisitLog();
+    }).catch(function (e) {
+      console.warn('[EHS] 방문 기록대장 조회 실패', e);
+      VISIT_ROWS = []; renderVisitLog();
+    });
+}
+function tryVisitLogPin() {
+  var el = $('visitLogPin');
+  if ((el ? el.value.trim() : '') === VISIT_LOG_PIN) {
+    VISIT_LOG_UNLOCKED = true;
+    renderVisitLog();
+    loadVisitLog();
+  } else {
+    var err = $('visitLogPinErr'); if (err) err.hidden = false;
+    if (el) { el.value = ''; el.focus(); }
+  }
+}
+function visitFiltered() {
+  var q = ($('vsLogQ').value || '').trim().toLowerCase().replace(/\s+/g, '');
+  var from = $('vsLogFrom').value, to = $('vsLogTo').value;
+  return VISIT_ROWS.filter(function (r) {
+    var day = ymd(new Date(r.created_at));
+    if (from && day < from) return false;
+    if (to && day > to) return false;
+    if (!q) return true;
+    return [r.name, r.company, r.phone, r.car_no].join('|').toLowerCase().replace(/\s+/g, '').indexOf(q) !== -1;
+  });
+}
+function renderVisitLog() {
+  if (!VISIT_LOG_UNLOCKED) {
+    $('visitLogGate').innerHTML =
+      '<div class="pin-gate"><div class="pin-box"><p class="ic">🔒</p>' +
+      '<h3>방문 기록대장</h3><p>개인정보가 담긴 게시판입니다.<br>비밀번호를 입력하면 열람할 수 있습니다.</p>' +
+      '<div class="pin-row"><input type="password" inputmode="numeric" maxlength="4" id="visitLogPin" placeholder="••••" autocomplete="off">' +
+      '<button class="btn-go" id="visitLogPinGo">확인</button></div>' +
+      '<p class="pin-err" id="visitLogPinErr" hidden>비밀번호가 올바르지 않습니다.</p></div></div>';
+    $('visitLogBody').hidden = true;
+    return;
+  }
+  $('visitLogGate').innerHTML = '';
+  $('visitLogBody').hidden = false;
+
+  var today = ymd(new Date()), month = today.slice(0, 7);
+  var nToday = VISIT_ROWS.filter(function (r) { return ymd(new Date(r.created_at)) === today; }).length;
+  var nMonth = VISIT_ROWS.filter(function (r) { return ymd(new Date(r.created_at)).slice(0, 7) === month; }).length;
+  $('visitLogKpi').innerHTML =
+    kpi('오늘 제출', nf(nToday), '건', today) +
+    kpi('이번 달 제출', nf(nMonth), '건', month.replace('-', '년 ') + '월') +
+    kpi('보관 중', nf(VISIT_ROWS.length), '건', '수집일로부터 ' + VISIT_KEEP_MONTHS + '개월 보관 후 자동 삭제');
+
+  var rows = visitFiltered();
+  if (!rows.length) {
+    $('visitLogList').innerHTML = '<div class="empty"><b>' + (VISIT_ROWS.length ? '조건에 맞는 기록이 없습니다' : '제출된 서약서가 없습니다') + '</b>' +
+      '공통 › 방문 서약서에서 제출하면 여기에 쌓입니다.</div>';
+    return;
+  }
+  $('visitLogList').innerHTML = tbl(
+    [{ t: '제출일시', w: '120px' }, { t: '이름' }, { t: '업체명' }, { t: '연락처' }, { t: '차량번호' },
+     { t: '동의', w: '56px' }, { t: '자동삭제 예정', w: '96px' }, { t: '', w: '64px' }],
+    rows.map(function (r) {
+      return '<tr><td class="n dim">' + esc(fmtDateTime(r.created_at)) + '</td>' +
+        '<td class="k">' + esc(r.name) + '</td><td>' + esc(r.company) + '</td>' +
+        '<td class="n">' + esc(r.phone) + '</td><td>' + esc(r.car_no) + '</td>' +        '<td>' + (r.agree_privacy ? '동의' : '—') + '</td>' +
+        '<td class="n dim">' + esc(visitPurgeDate(r.created_at)) + '</td>' +
+        '<td><button class="reset" style="padding:5px 10px;font-size:10.5px" data-visitdel="' + r.id + '">삭제</button></td></tr>';
+    }), 860);
+}
+function deleteVisit(id) {
+  if (!confirm('이 방문 기록을 삭제할까요?')) return;
+  RPC.db.from('visit_pledges').delete().eq('id', id)
+    .then(function (res) { if (res.error) throw res.error; toast('삭제했습니다.'); loadVisitLog(); })
+    .catch(function (e) { toast('삭제 실패: ' + ((e && e.message) || e), 'err'); });
+}
+function exportVisitXlsx() {
+  var rows = visitFiltered();
+  if (!rows.length) { toast('내려받을 기록이 없습니다.', 'warn'); return; }
+  var ws = XLSX.utils.json_to_sheet(rows.map(function (r) {
+    return {
+      '제출일시': fmtDateTime(r.created_at), '이름': r.name, '업체명': r.company, '연락처': r.phone,
+      '차량번호': r.car_no, '수칙 서약': r.agree_rules ? '서약' : '',
+      '개인정보 동의': r.agree_privacy ? '동의' : '', '자동삭제 예정일': visitPurgeDate(r.created_at)
+    };
+  }));
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '방문 기록대장');
+  XLSX.writeFile(wb, '방문기록대장_' + ymd(new Date()) + '.xlsx');
+}
+
+/* ============================================================
  *  6-7. 데일리뉴스 · EHS 브리핑
  *
  *  · 뉴스  : 구글 뉴스 RSS(한국어)를 분야별 검색어로 받아 옵니다.
@@ -6494,6 +6655,7 @@ function refresh(silent) {
     loadQse();
     loadPopup();
     loadLib();
+    if (VISIT_LOG_UNLOCKED) loadVisitLog();
     loadNews();
     loadStatusOverrides();
     setSync('동기화됨', 'ok');
@@ -6545,7 +6707,7 @@ function startRealtime() {
 /* ============================================================
  *  8. 이벤트 연결
  * ============================================================ */
-var TAB_LIST = ['month', 'week', 'kpi', 'safinspect', 'safrisk', 'safmeet', 'edu', 'safdevice', 'heaact', 'heaexam', 'heaenv', 'heaedu', 'envwaste', 'envghg', 'envwater', 'envair', 'accident', 'budget', 'csa', 'qse', 'library', 'news'];
+var TAB_LIST = ['month', 'week', 'kpi', 'safinspect', 'safrisk', 'safmeet', 'edu', 'safdevice', 'heaact', 'heaexam', 'heaenv', 'heaedu', 'envwaste', 'envghg', 'envwater', 'envair', 'accident', 'budget', 'csa', 'qse', 'library', 'visit', 'visitlog', 'news'];
 /** 상단 "공통" · "안전" 버튼이 묶고 있는 게시판들. 그룹을 누르면 아래 두 번째 줄에 이 목록이 펼쳐집니다. */
 var NAV_GROUPS = {
   common: { label: '공통', sub: [
@@ -6554,6 +6716,8 @@ var NAV_GROUPS = {
     { tab: 'budget', label: '예산' },
     { tab: 'library', label: '자료실' },
     { tab: 'news', label: '데일리뉴스' },
+    { tab: 'visit', label: '방문 서약서' },
+    { tab: 'visitlog', label: '방문 기록대장' },
     // href가 있는 항목은 게시판 탭이 아니라 외부 사이트(새 창)로 연결됩니다.
     { href: 'https://ai-assist.kosha.or.kr/law/', label: 'AI 어드바이저' },
     { href: 'https://ai-assist.kosha.or.kr/mfg/', label: 'AI 위험요인 사진 업로드' }
@@ -6617,6 +6781,8 @@ function activateTab(t) {
     var el = $('bd-' + tt); if (el) el.hidden = t !== tt;
   });
   if (t === 'news') newsTabOpened();
+  if (t === 'visit') openVisitFrame();
+  if (t === 'visitlog' && VISIT_LOG_UNLOCKED) loadVisitLog();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -6836,6 +7002,9 @@ function bind() {
 
     var libdel = e.target.closest('[data-libdel]');
     if (libdel) { deleteLib(libdel.dataset.libdel); return; }
+    var visitdel = e.target.closest('[data-visitdel]');
+    if (visitdel) { deleteVisit(visitdel.dataset.visitdel); return; }
+    if (e.target.closest('#visitLogPinGo')) { tryVisitLogPin(); return; }
 
     var nvw = e.target.closest('[data-newsview]');
     if (nvw) { NEWS.view = nvw.dataset.newsview; renderNews(); return; }
@@ -6867,6 +7036,7 @@ function bind() {
     if (e.key === 'Escape' && $('dayPopup').classList.contains('on')) closeDayPopup();
     if (e.key === 'Escape' && $('gpsWxModal').classList.contains('on')) closeGpsWeather();
     if (e.key === 'Enter' && e.target && e.target.id === 'heaExamPin') { e.preventDefault(); tryHeaExamPin(); }
+    if (e.key === 'Enter' && e.target && e.target.id === 'visitLogPin') { e.preventDefault(); tryVisitLogPin(); }
   });
 
   // 연간 스케줄: 월 열에 마우스를 올리면 그 열 전체 음영
@@ -6901,6 +7071,20 @@ function bind() {
   $('btnQseReset').onclick = function () { if (confirm('작성 중인 평가 내용을 초기화할까요?')) resetQseForm(); };
 
   $('btnLibUpload').onclick = submitLib;
+
+  // 방문 서약서 탭 안의 visit.html 이 보내는 신호 : 높이 맞추기 · 맨 위로 · 제출 완료
+  window.addEventListener('message', function (e) {
+    var d = e.data, f = $('vsFrame');
+    if (!d || d.src !== 'visit' || !f || e.source !== f.contentWindow) return;
+    if (d.type === 'height') f.style.height = Math.ceil(d.h) + 'px';
+    if (d.type === 'top') f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (d.type === 'toast') toast(String(d.msg || ''), d.kind === 'warn' ? 'warn' : '');
+    if (d.type === 'submitted' && VISIT_LOG_UNLOCKED) loadVisitLog();
+  });
+  $('vsLogQ').oninput = renderVisitLog;
+  $('vsLogFrom').onchange = renderVisitLog;
+  $('vsLogTo').onchange = renderVisitLog;
+  $('btnVisitXlsx').onclick = exportVisitXlsx;
 
   $('btnNewsCollect').onclick = function () { collectNews(); };
   $('btnNewsAi').onclick = function () { aiSummarize(); };
@@ -7058,6 +7242,7 @@ function bindLogin() {
     month: ['Schedule', '월간 스케줄'], week: ['Weekly', '주간업무'],
     kpi: ['KPI', 'KPI'], accident: ['Accident', '안전사고'], budget: ['Budget', '예산'],
     library: ['Library', '자료실'], news: ['Daily News', '데일리뉴스'],
+    visit: ['Visitor Pledge', '방문 서약서'], visitlog: ['Visitor Log', '방문 기록대장'],
     safinspect: ['Inspection', '안전점검'], safrisk: ['Risk Assessment', '위험성평가'],
     safmeet: ['Committee', '회의체'], edu: ['Training', '교육'], safdevice: ['Safety Device', '안전장치'],
     heaact: ['Wellness', '보건활동'], heaexam: ['Check-up', '건강검진/상담'],
@@ -7070,7 +7255,7 @@ function bindLogin() {
     safinspect: '안전', safrisk: '안전', safmeet: '안전', edu: '안전', safdevice: '안전',
     heaact: '보건', heaexam: '보건', heaenv: '보건', heaedu: '보건',
     envwaste: '환경', envghg: '환경', envwater: '환경', envair: '환경',
-    kpi: '공통', accident: '공통', budget: '공통', library: '공통', news: '공통',
+    kpi: '공통', accident: '공통', budget: '공통', library: '공통', news: '공통', visit: '공통', visitlog: '공통',
     qse: '중대재해처벌법'
   };
   var big = document.getElementById('hxBig'), crumb = document.getElementById('hxCrumb');
