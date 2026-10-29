@@ -12,7 +12,7 @@
 <!-- ══════════════════════════════════════════════════════════
      방문 기록대장 전용 페이지 (visitlog.html)
      · 비밀번호를 넣으면 방문 기록대장만 볼 수 있고, 대시보드나 다른 게시판으로 가는 메뉴 · 링크가 없습니다.
-     · 열람 · 검색 · 엑셀 다운로드만 됩니다. (삭제는 대시보드의 "공통 › 방문 기록대장"에서)
+     · 열람 · 검색 · 엑셀 다운로드 · 삭제(삭제 비밀번호 필요)가 됩니다.
      · SB_CONFIG 는 index.html 과 같은 값을, VISIT_LOG_PIN 은 대시보드와 같은 비밀번호를 넣으세요.
      ══════════════════════════════════════════════════════════ -->
 <script>
@@ -79,6 +79,8 @@ window.SB_CONFIG = {
   td{padding:12px 10px;border-bottom:1px solid var(--line)}
   td.b{font-weight:600}
   td.sub{color:var(--ink3);font-variant-numeric:tabular-nums}
+  .del{padding:5px 10px;font-size:11.5px;color:var(--ink2);background:#fff;border:1px solid var(--line);border-radius:7px;cursor:pointer}
+  .del:hover{color:var(--human);border-color:var(--human)}
   .empty{padding:40px 10px;text-align:center;font-size:13px;color:var(--ink3);line-height:1.7}
   .empty b{display:block;color:var(--ink2)}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);padding:11px 18px;border-radius:10px;
@@ -129,6 +131,7 @@ window.SB_CONFIG = {
 <script>
 (function () {
   var VISIT_LOG_PIN = '1004';      // 대시보드 방문 기록대장과 같은 비밀번호
+  var VISIT_DEL_PIN = '8587';      // 방문 기록 삭제 시 한 번 더 묻는 비밀번호
   var VISIT_KEEP_MONTHS = 6;
   var ROWS = [];
 
@@ -200,14 +203,24 @@ window.SB_CONFIG = {
       $('list').innerHTML = '<div class="empty"><b>' + (ROWS.length ? '조건에 맞는 기록이 없습니다' : '제출된 서약서가 없습니다') + '</b></div>';
       return;
     }
-    $('list').innerHTML = '<table><thead><tr><th>제출일시</th><th>이름</th><th>업체명</th><th>연락처</th><th>차량번호</th><th>동의</th><th>자동삭제 예정</th></tr></thead><tbody>' +
+    $('list').innerHTML = '<table><thead><tr><th>제출일시</th><th>이름</th><th>업체명</th><th>연락처</th><th>차량번호</th><th>동의</th><th>자동삭제 예정</th><th></th></tr></thead><tbody>' +
       rows.map(function (r) {
         return '<tr><td class="sub">' + esc(fmtDateTime(r.created_at)) + '</td>' +
           '<td class="b">' + esc(r.name) + '</td><td>' + esc(r.company) + '</td>' +
           '<td>' + esc(r.phone) + '</td><td>' + esc(r.car_no) + '</td>' +
           '<td>' + (r.agree_privacy ? '동의' : '—') + '</td>' +
-          '<td class="sub">' + esc(purgeDate(r.created_at)) + '</td></tr>';
+          '<td class="sub">' + esc(purgeDate(r.created_at)) + '</td>' +
+          '<td><button class="del" data-del="' + esc(r.id) + '">삭제</button></td></tr>';
       }).join('') + '</tbody></table>';
+  }
+
+  function deleteVisit(id) {
+    var pin = prompt('이 방문 기록을 삭제하려면 삭제 비밀번호를 입력하세요.');
+    if (pin === null) return;
+    if (pin.trim() !== VISIT_DEL_PIN) { toast('삭제 비밀번호가 올바르지 않습니다.', 'err'); return; }
+    db.from('visit_pledges').delete().eq('id', id)
+      .then(function (res) { if (res.error) throw res.error; toast('삭제했습니다.'); load(); })
+      .catch(function (e) { toast('삭제 실패: ' + ((e && e.message) || e), 'err'); });
   }
 
   function exportXlsx() {
@@ -245,6 +258,10 @@ window.SB_CONFIG = {
   $('to').addEventListener('change', render);
   $('btnReload').onclick = load;
   $('btnXlsx').onclick = exportXlsx;
+  $('list').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-del]');
+    if (b) deleteVisit(b.getAttribute('data-del'));
+  });
   $('pin').focus();
 })();
 </script>
